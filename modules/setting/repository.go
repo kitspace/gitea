@@ -125,8 +125,8 @@ var (
 			Enabled:      true,
 			TempPath:     "data/tmp/uploads",
 			AllowedTypes: []string{},
-			FileMaxSize:  3,
-			MaxFiles:     5,
+			FileMaxSize:  100,
+			MaxFiles:     10000,
 		},
 
 		// Repository local settings
