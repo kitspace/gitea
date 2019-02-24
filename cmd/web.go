@@ -119,7 +119,10 @@ func runWeb(ctx *cli.Context) error {
 
 	// Set up Macaron
 	m := routes.NewMacaron()
-	routes.RegisterRoutes(m)
+
+	m.Group("/_gitea", func() {
+		routes.RegisterRoutes(m)
+	})
 
 	// Flag for port number in case first time run conflict.
 	if ctx.IsSet("port") {
