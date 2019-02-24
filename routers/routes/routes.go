@@ -238,6 +238,10 @@ func NewMacaron() *macaron.Macaron {
 	return m
 }
 
+func RegisterKitspaceRoutes(m *macaron.Macaron) {
+	m.Get("/", routers.Kitspace)
+}
+
 // RegisterRoutes routes routes to Macaron
 func RegisterRoutes(m *macaron.Macaron) {
 	reqSignIn := context.Toggle(&context.ToggleOptions{SignInRequired: true})
