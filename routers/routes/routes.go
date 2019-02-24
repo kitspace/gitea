@@ -240,7 +240,7 @@ func NewMacaron() *macaron.Macaron {
 }
 
 func RegisterKitspaceRoutes(m *macaron.Macaron) {
-	m.Get("/", routers.Kitspace)
+	m.Get("/kitspace/?*", routers.Kitspace)
 }
 
 // RegisterRoutes routes routes to Macaron
