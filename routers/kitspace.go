@@ -2,15 +2,39 @@ package routers
 
 import (
 	"bytes"
+	"code.gitea.io/gitea/models"
 	"code.gitea.io/gitea/modules/context"
+	"encoding/json"
+	"fmt"
+	"github.com/go-macaron/csrf"
+	"github.com/go-macaron/session"
 	"io/ioutil"
 	"net/http"
+	"strings"
+
+	"gitea.com/macaron/csrf"
+	"gitea.com/macaron/session"
+
+	"code.gitea.io/gitea/models"
+	"code.gitea.io/gitea/modules/context"
+	"code.gitea.io/gitea/modules/setting"
 )
 
-func Kitspace(ctx *context.Context) []byte {
+type Message struct {
+	User  *models.User
+	Csrf  string
+	Route string
+}
+
+func Kitspace(ctx *context.Context, sess session.Store, x csrf.CSRF) []byte {
+	m := Message{User: ctx.User, Csrf: x.GetToken(), Route: strings.Replace(ctx.Link, "/kitspace", "", 1)}
+	fmt.Printf("%+v\n", ctx)
+	b, err := json.Marshal(m)
+	if err != nil {
+		panic(err)
+	}
 	url := "http://localhost:3001/"
-	data := []byte(`{"hello": "world"}`)
-	resp, err := http.Post(url, "application/json", bytes.NewBuffer(data))
+	resp, err := http.Post(url, "application/json", bytes.NewBuffer(b))
 	if err != nil {
 		panic(err)
 	}
