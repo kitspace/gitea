@@ -120,6 +120,8 @@ func runWeb(ctx *cli.Context) error {
 	// Set up Macaron
 	m := routes.NewMacaron()
 
+	routes.RegisterKitspaceRoutes(m)
+
 	m.Group("/_gitea", func() {
 		routes.RegisterRoutes(m)
 	})
