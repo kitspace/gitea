@@ -220,6 +220,7 @@ func NewMacaron() *macaron.Macaron {
 		Header:         "X-Csrf-Token",
 		CookieDomain:   setting.SessionConfig.Domain,
 		CookiePath:     setting.AppSubURL,
+		SetHeader:      true,
 	}))
 	m.Use(toolbox.Toolboxer(m, toolbox.Options{
 		HealthCheckFuncs: []*toolbox.HealthCheckFuncDesc{
