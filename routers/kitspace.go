@@ -24,7 +24,7 @@ type KitspaceSession struct {
 func Kitspace(ctx *context.Context, sess session.Store, x csrf.CSRF) (int, []byte) {
 	url := ctx.Req.URL
 	url.Scheme = "http"
-	url.Host = "127.0.0.1:3001"
+	url.Host = "frontend:3000"
 	url.Path = strings.Replace(
 		ctx.Link,
 		path.Join(setting.AppSubURL, "/kitspace"),
