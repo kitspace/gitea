@@ -50,6 +50,8 @@ func Kitspace(ctx *context.Context, sess session.Store, x csrf.CSRF) (int, []byt
 		panic(err)
 	}
 
+	ctx.Resp.Header().Set("Content-Type", resp.Header.Get("Content-Type"))
+
 	defer resp.Body.Close()
 	body, err := ioutil.ReadAll(resp.Body)
 	if err != nil {
