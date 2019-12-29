@@ -11,13 +11,14 @@ import (
 	"gitea.com/macaron/csrf"
 	"gitea.com/macaron/session"
 
-	"code.gitea.io/gitea/models"
 	"code.gitea.io/gitea/modules/context"
+	"code.gitea.io/gitea/modules/convert"
 	"code.gitea.io/gitea/modules/setting"
+	"code.gitea.io/gitea/modules/structs"
 )
 
 type KitspaceSession struct {
-	User *models.User
+	User *structs.User
 	Csrf string
 }
 
@@ -33,7 +34,7 @@ func Kitspace(ctx *context.Context, sess session.Store, x csrf.CSRF) (int, []byt
 	)
 
 	m := KitspaceSession{
-		User: ctx.User,
+		User: convert.ToUser(ctx.User, ctx.IsSigned, ctx.User != nil),
 		Csrf: x.GetToken(),
 	}
 
