@@ -28,7 +28,7 @@ func Kitspace(ctx *context.Context, sess session.Store, x csrf.CSRF) (int, []byt
 	url.Host = "frontend:3000"
 	url.Path = strings.Replace(
 		ctx.Link,
-		path.Join(setting.AppSubURL, "/kitspace"),
+		path.Join(setting.AppSubURL, "/__kitspace"),
 		"",
 		1,
 	)
