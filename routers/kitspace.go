@@ -18,8 +18,8 @@ import (
 )
 
 type KitspaceSession struct {
-	User *structs.User
-	Csrf string
+	User *structs.User `json:"user"`
+	Csrf string        `json:"_csrf"`
 }
 
 func Kitspace(ctx *context.Context, sess session.Store, x csrf.CSRF) (int, []byte) {
