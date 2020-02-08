@@ -32,9 +32,13 @@ func Kitspace(ctx *context.Context, sess session.Store, x csrf.CSRF) (int, []byt
 		"",
 		1,
 	)
+	var user *structs.User
+	if (ctx.User != nil && ctx.IsSigned) {
+		user = convert.ToUser(ctx.User, true, true)
+	}
 
 	m := KitspaceSession{
-		User: convert.ToUser(ctx.User, ctx.IsSigned, ctx.User != nil),
+		User: user,
 		Csrf: x.GetToken(),
 	}
 
