@@ -8,8 +8,8 @@ import (
 	"path"
 	"strings"
 
-	"github.com/go-macaron/csrf"
-	"github.com/go-macaron/session"
+	"gitea.com/macaron/csrf"
+	"gitea.com/macaron/session"
 
 	"code.gitea.io/gitea/models"
 	"code.gitea.io/gitea/modules/context"
