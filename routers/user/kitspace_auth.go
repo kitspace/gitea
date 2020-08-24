@@ -11,7 +11,7 @@ import (
 	"code.gitea.io/gitea/modules/context"
 )
 
-func CustomSignUp(ctx *context.Context, form auth.RegisterForm) {
+func KitspaceSignUp(ctx *context.Context, form auth.RegisterForm) {
 	// TODO: docs.
 	if len(form.Password) < setting.MinPasswordLength {
 		ctx.JSON(http.StatusUnprocessableEntity, "Password is too short.")
@@ -25,9 +25,9 @@ func CustomSignUp(ctx *context.Context, form auth.RegisterForm) {
 	}
 
 	u := &models.User{
-		Name: form.UserName,
-		Email: form.Email,
-		Passwd: form.Password,
+		Name:     form.UserName,
+		Email:    form.Email,
+		Passwd:   form.Password,
 		IsActive: !setting.Service.RegisterEmailConfirm,
 	}
 
@@ -54,7 +54,6 @@ func CustomSignUp(ctx *context.Context, form auth.RegisterForm) {
 		ctx.JSON(http.StatusOK, response)
 		return
 	}
-
 
 	// Send confirmation email
 	// TODO: this needs updating the conf file in /custom

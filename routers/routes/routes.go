@@ -322,7 +322,7 @@ func RegisterRoutes(m *macaron.Macaron) {
 		}, openIDSignInEnabled)
 		m.Get("/sign_up", user.SignUp)
 		m.Post("/sign_up", bindIgnErr(auth.RegisterForm{}), user.SignUpPost)
-		m.Post("/signup", bind(auth.RegisterForm{}), user.CustomSignUp)
+		m.Post("/kitspace_sign_up_api", bind(auth.RegisterForm{}), user.KitspaceSignUp)
 		m.Group("/oauth2", func() {
 			m.Get("/:provider", user.SignInOAuth)
 			m.Get("/:provider/callback", user.SignInOAuthCallback)
