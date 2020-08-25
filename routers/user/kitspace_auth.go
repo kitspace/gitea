@@ -318,3 +318,79 @@ func handleKitspaceResetPassword(ctx *context.Context) *models.User {
 	}
 	return u
 }
+
+func KitspaceActivate(ctx *context.Context) {
+	code := ctx.Query("code")
+
+	if len(code) == 0 {
+		if ctx.User.IsActive {
+			ctx.JSON(http.StatusNotFound, "Page not found.")
+			return
+		}
+
+		if setting.Service.RegisterEmailConfirm {
+			if ctx.Cache.IsExist("MailResendLimit_" + ctx.User.LowerName) {
+				response := make(map[string]bool)
+				response["ResendLimited"] = true
+
+				ctx.JSON(http.StatusTooManyRequests, response)
+				return
+			} else {
+				ctx.Data["ActiveCodeLives"] = timeutil.MinutesToFriendly(
+					setting.Service.ActiveCodeLives,
+					ctx.Locale.Language(),
+				)
+
+				mailer.SendActivateAccountMail(ctx.Locale, ctx.User)
+
+				if err := ctx.Cache.Put("MailResendLimit_"+ctx.User.LowerName, ctx.User.LowerName, 180); err != nil {
+					log.Error("Set cache(MailResendLimit) fail: %v", err)
+				}
+			}
+		} else {
+			ctx.JSON(http.StatusNotFound, "Password reset isn't activated, contact support.")
+			return
+		}
+		// TODO: failure message.
+		ctx.JSON(http.StatusOK, "")
+		return
+	}
+
+	// verify code
+	if u := models.VerifyUserActiveCode(code); u != nil {
+		u.IsActive = true
+
+		var err error
+		if u.Rands, err = models.GetUserSalt(); err != nil {
+			ctx.ServerError("UpdateUser", err)
+			return
+		}
+		if err := models.UpdateUserCols(u, "is_active", "rands"); err != nil {
+			if models.IsErrUserNotExist(err) {
+				ctx.JSON(http.StatusNotFound, "User not found.")
+			} else {
+				ctx.ServerError("UpdateUser", err)
+			}
+			return
+		}
+
+		log.Trace("User activated: %s", u.Name)
+
+		if err := ctx.Session.Set("uid", u.ID); err != nil {
+			log.Error(fmt.Sprintf("Error setting uid in session: %v", err))
+		}
+		if err := ctx.Session.Set("uname", u.Name); err != nil {
+			log.Error(fmt.Sprintf("Error setting uname in session: %v", err))
+		}
+		if err := ctx.Session.Release(); err != nil {
+			log.Error("Error storing session: %v", err)
+		}
+
+		ctx.JSON(http.StatusOK, ctx.Tr("auth.account_activated"))
+		return
+	}
+
+	ctx.Data["IsActivateFailed"] = true
+	// TODO: failure message.
+	ctx.JSON(http.StatusOK, "")
+}
