@@ -306,7 +306,9 @@ func RegisterRoutes(m *macaron.Macaron) {
 		m.Group("/kitspace", func() {
 			m.Post("/sign_up", bind(auth.RegisterForm{}), user.KitspaceSignUp)
 			m.Post("/sign_in", bind(auth.SignInForm{}), user.KitspaceSignIn)
+			m.Post("/forgot_password", user.KitspaceForgotPassword)
 		})
+
 		m.Get("/login", user.SignIn)
 		m.Post("/login", bindIgnErr(auth.SignInForm{}), user.SignInPost)
 		m.Group("", func() {

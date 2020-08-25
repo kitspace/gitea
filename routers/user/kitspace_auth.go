@@ -11,6 +11,8 @@ import (
 	"code.gitea.io/gitea/modules/log"
 	"code.gitea.io/gitea/modules/password"
 	"code.gitea.io/gitea/modules/setting"
+	"code.gitea.io/gitea/modules/timeutil"
+	"code.gitea.io/gitea/services/mailer"
 )
 
 func KitspaceSignUp(ctx *context.Context, form auth.RegisterForm) {
@@ -183,4 +185,55 @@ func handleKitspaceSignIn(ctx *context.Context, user *models.User, remember bool
 	}
 	ctx.JSON(http.StatusPermanentRedirect, "")
 	return
+}
+
+func KitspaceForgotPassword(ctx *context.Context) {
+	if setting.MailService == nil {
+		ctx.JSON(http.StatusNotFound, "Password reset isn't activated, contact support.")
+		return
+	}
+
+	email := ctx.Query("email")
+
+	u, err := models.GetUserByEmail(email)
+
+	if err != nil {
+		// TODO: this doesn't make sense!
+		if models.IsErrUserNotExist(err) {
+			response := make(map[string]string)
+			response["ResetPasswdCodeLives"] = timeutil.MinutesToFriendly(
+				setting.Service.ResetPwdCodeLives,
+				ctx.Locale.Language(),
+			)
+			response["IsResetSent"] = "true"
+
+			ctx.JSON(http.StatusOK, response)
+			return
+		}
+		ctx.ServerError("user.ResetPasswd(check existence", err)
+		return
+	}
+
+	if ctx.Cache.IsExist("MailResendLimit_" + u.LowerName) {
+		response := make(map[string]bool)
+		response["ResendLimited"] = true
+
+		ctx.JSON(http.StatusTooManyRequests, response)
+		return
+	}
+
+	mailer.SendResetPasswordMail(ctx.Locale, u)
+
+	if err = ctx.Cache.Put("MailResendLimit_", u.LowerName, 100); err != nil {
+		log.Error("Set cache(MailResendLimit) fail: %v", err)
+	}
+
+	response := make(map[string]string)
+	response["ResetPasswdCodeLives"] = timeutil.MinutesToFriendly(
+		setting.Service.ResetPwdCodeLives,
+		ctx.Locale.Language(),
+	)
+	response["IsResetSent"] = "true"
+
+	ctx.JSON(http.StatusOK, response)
 }
