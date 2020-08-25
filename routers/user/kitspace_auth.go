@@ -1,3 +1,4 @@
+// TODO: docs, encode all response as jsom.
 package user
 
 import (
@@ -16,7 +17,6 @@ import (
 )
 
 func KitspaceSignUp(ctx *context.Context, form auth.RegisterForm) {
-	// TODO: docs.
 	if len(form.Password) < setting.MinPasswordLength {
 		ctx.JSON(http.StatusUnprocessableEntity, "Password is too short.")
 		return
