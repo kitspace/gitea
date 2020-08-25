@@ -307,6 +307,7 @@ func RegisterRoutes(m *macaron.Macaron) {
 			m.Post("/sign_up", bind(auth.RegisterForm{}), user.KitspaceSignUp)
 			m.Post("/sign_in", bind(auth.SignInForm{}), user.KitspaceSignIn)
 			m.Post("/forgot_password", user.KitspaceForgotPassword)
+			m.Post("/reset_password", user.KitspaceResetPassword)
 		})
 
 		m.Get("/login", user.SignIn)

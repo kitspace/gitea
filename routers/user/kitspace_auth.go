@@ -237,3 +237,84 @@ func KitspaceForgotPassword(ctx *context.Context) {
 
 	ctx.JSON(http.StatusOK, response)
 }
+
+func KitspaceResetPassword(ctx *context.Context) {
+	u := handleKitspaceResetPassword(ctx)
+
+	if ctx.Written() {
+		return
+	}
+
+	if u == nil {
+		ctx.JSON(http.StatusOK, "this should be an error.")
+		return
+	}
+
+	// Validate passwd length.
+	passwd := ctx.Query("password")
+
+	if len(passwd) < setting.MinPasswordLength {
+		ctx.JSON(http.StatusUnprocessableEntity, "Password is too short.")
+		return
+	} else if !password.IsComplexEnough(passwd) {
+		ctx.JSON(http.StatusUnprocessableEntity, "Password isn't complex enough")
+		return
+	}
+
+	var err error
+
+	if u.Rands, err = models.GetUserSalt(); err != nil {
+		ctx.ServerError("UpdateUser.", err)
+		return
+	}
+	if u.Salt, err = models.GetUserSalt(); err != nil {
+		ctx.ServerError("UpdateUser", err)
+		return
+	}
+
+	u.HashPassword(passwd)
+	u.MustChangePassword = false
+
+	if err := models.UpdateUserCols(u, "must_change_password", "passwd", "rands", "salt"); err != nil {
+		ctx.ServerError("UpdateUser", err)
+		return
+	}
+
+	log.Trace("User password reset %s", u.Name)
+	ctx.Data["IsResetFailed"] = true
+
+	remember := len(ctx.Query("remember")) != 0
+
+	handleKitspaceSignIn(ctx, u, remember)
+}
+
+func handleKitspaceResetPassword(ctx *context.Context) *models.User {
+	// Probably the flash error isn't relevant here.
+
+	code := ctx.Query("code")
+	ctx.Data["Code"] = code
+
+	if ctx.User != nil {
+		ctx.Data["user_signed_in"] = true
+	}
+
+	if len(code) == 0 {
+		ctx.Flash.Error(ctx.Tr("auth.invalid_code"))
+		return nil
+	}
+
+	u := models.VerifyUserActiveCode(code)
+	if u == nil {
+		ctx.Flash.Error(ctx.Tr("auth.invalid_code"))
+		return nil
+	}
+
+	// Show the user that they are affecting the account that they intended to
+	ctx.Data["UserEmail"] = u.Email
+
+	if ctx.User != nil && u.ID != ctx.User.ID {
+		ctx.Flash.Error(ctx.Tr("auth.reset_password_wrong_user", ctx.User.Email, u.Email))
+		return nil
+	}
+	return u
+}
