@@ -1,4 +1,4 @@
-// TODO: docs, encode all response as jsom.
+// TODO: docs.
 package user
 
 import (
@@ -127,7 +127,6 @@ func handleKitspaceSignIn(ctx *context.Context, user *models.User, remember bool
 		if err := models.UpdateUserCols(user, "language"); err != nil {
 			log.Error(fmt.Sprintf("Error updating user language [user: %d, locale: %s]", user.ID, user.Language))
 
-			// TODO: replace this a proper redirect json response
 			ctx.JSON(http.StatusPermanentRedirect, "")
 			return
 		}
