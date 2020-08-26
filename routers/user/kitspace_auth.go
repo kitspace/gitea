@@ -20,7 +20,6 @@ func KitspaceSignUp(ctx *context.Context, form auth.RegisterForm) {
 		return
 	}
 
-	// TODO: update complexity settings.
 	if !password.IsComplexEnough(form.Password) {
 		ctx.JSON(http.StatusUnprocessableEntity, "Password isn't complex enough")
 		return
@@ -48,7 +47,6 @@ func KitspaceSignUp(ctx *context.Context, form auth.RegisterForm) {
 		}
 		return
 	} else {
-		// TODO: once email configuration is setup, the whole else block is no longer needed.
 		log.Trace("Account created: %s", u.Name)
 		response := make(map[string]bool)
 		response["IsRegisteredSuccessfully"] = true
@@ -56,25 +54,6 @@ func KitspaceSignUp(ctx *context.Context, form auth.RegisterForm) {
 		ctx.JSON(http.StatusOK, response)
 		return
 	}
-
-	// Send confirmation email
-	// TODO: this needs updating the conf file in /custom
-	//if setting.Service.RegisterEmailConfirm && u.ID > 1 {
-	//	mailer.SendActivateAccountMail(ctx.Locale, u)
-	//
-	//	response := make(map[string]string)
-	//	response["IsRegisterMailSent"] = "true"
-	//	response["email"] = u.Email
-	//	response["ActiveCodeLives"] = timeutil.MinutesToFriendly(setting.Service.ActiveCodeLives,
-	//		ctx.Locale.Language())
-	//
-	//	if err := ctx.Cache.Put("MailResendLimit_"+u.LowerName, u.LowerName, 180); err != nil {
-	//		log.Error("Set cache(MailResendLimit) fail: %v", err)
-	//	}
-	//
-	//	ctx.JSON(http.StatusOK, response)
-	//	return
-	//}
 }
 
 func KitspaceSignIn(ctx *context.Context, form auth.SignInForm) {
