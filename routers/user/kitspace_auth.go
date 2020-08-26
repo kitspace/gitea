@@ -86,7 +86,6 @@ func KitspaceSignIn(ctx *context.Context, form auth.SignInForm) {
 }
 
 func handleKitspaceSignIn(ctx *context.Context, user *models.User, remember bool) {
-	// This needs re-write.
 	if remember {
 		days := 86400 * setting.LogInRememberDays
 		ctx.SetCookie(
@@ -161,6 +160,9 @@ func handleKitspaceSignIn(ctx *context.Context, user *models.User, remember bool
 		ctx.JSON(http.StatusPermanentRedirect, "")
 		return
 	}
-	ctx.JSON(http.StatusPermanentRedirect, "")
+	response := make(map[string]bool)
+	response["LoggedInSuccessfully "] = true
+
+	ctx.JSON(http.StatusPermanentRedirect, response)
 	return
 }
