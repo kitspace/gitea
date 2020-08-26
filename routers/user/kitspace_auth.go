@@ -109,6 +109,7 @@ func KitspaceSignIn(ctx *context.Context, form auth.SignInForm) {
 }
 
 func handleKitspaceSignIn(ctx *context.Context, user *models.User, remember bool) {
+	// This needs re-write.
 	if remember {
 		days := 86400 * setting.LogInRememberDays
 		ctx.SetCookie(
@@ -188,6 +189,7 @@ func handleKitspaceSignIn(ctx *context.Context, user *models.User, remember bool
 }
 
 func KitspaceForgotPassword(ctx *context.Context) {
+	// This also broken
 	if setting.MailService == nil {
 		ctx.JSON(http.StatusNotFound, "Password reset isn't activated, contact support.")
 		return
@@ -239,6 +241,7 @@ func KitspaceForgotPassword(ctx *context.Context) {
 }
 
 func KitspaceResetPassword(ctx *context.Context) {
+	// This is also broken.
 	u := handleKitspaceResetPassword(ctx)
 
 	if ctx.Written() {
