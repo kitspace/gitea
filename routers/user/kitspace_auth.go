@@ -14,7 +14,30 @@ import (
 	"code.gitea.io/gitea/modules/setting"
 )
 
+// KitspaceSignUp custom sign-up compatible with Kitspace architecture
 func KitspaceSignUp(ctx *context.Context, form auth.RegisterForm) {
+	// swagger:operation POST /user/kitspace/sign_up auth RegisterForm
+	// ---
+	// summary: Create a user
+	// consumes:
+	// - application/json
+	// produces:
+	// - application/json
+	// parameters:
+	// - name: body
+	//   in: body
+	//   schema:
+	//     "$ref": "#/definitions/RegisterForm"
+	// responses:
+	//   "201":
+	//     "$ref": "#/responses/User"
+	//   "400":
+	//     "$ref": "#/responses/error"
+	//	 "409":
+	//     "$ref": "#/response/error
+	//   "422":
+	//     "$ref": "#/responses/validationError"
+
 	if len(form.Password) < setting.MinPasswordLength {
 		ctx.JSON(http.StatusUnprocessableEntity, "Password is too short.")
 		return
@@ -51,7 +74,7 @@ func KitspaceSignUp(ctx *context.Context, form auth.RegisterForm) {
 		response := make(map[string]bool)
 		response["IsRegisteredSuccessfully"] = true
 
-		ctx.JSON(http.StatusOK, response)
+		ctx.JSON(http.StatusCreated, response)
 		return
 	}
 }
@@ -162,6 +185,6 @@ func handleKitspaceSignIn(ctx *context.Context, user *models.User, remember bool
 	response := make(map[string]bool)
 	response["LoggedInSuccessfully "] = true
 
-	ctx.JSON(http.StatusPermanentRedirect, response)
+	ctx.JSON(http.StatusOK, response)
 	return
 }
