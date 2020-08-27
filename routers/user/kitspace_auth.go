@@ -1,4 +1,3 @@
-// TODO: docs.
 package user
 
 import (
