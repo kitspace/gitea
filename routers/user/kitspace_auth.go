@@ -2,7 +2,6 @@
 package user
 
 import (
-	"fmt"
 	"net/http"
 
 	"code.gitea.io/gitea/models"
@@ -165,19 +164,6 @@ func handleKitspaceSignIn(ctx *context.Context, user *models.User, remember bool
 
 	if err := ctx.Session.Release(); err != nil {
 		log.Error("Unable to store session: %v", err)
-	}
-
-	// Language setting of the user overwrites the one previously set
-	// If the user does not have a locale set, we save the current one.
-	if len(user.Language) == 0 {
-		user.Language = ctx.Locale.Language()
-
-		if err := models.UpdateUserCols(user, "language"); err != nil {
-			log.Error(fmt.Sprintf("Error updating user language [user: %d, locale: %s]", user.ID, user.Language))
-
-			ctx.JSON(http.StatusPermanentRedirect, "")
-			return
-		}
 	}
 
 	ctx.SetCookie(
