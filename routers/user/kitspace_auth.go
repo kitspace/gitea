@@ -15,7 +15,7 @@ import (
 
 // KitspaceSignUp custom sign-up compatible with Kitspace architecture
 func KitspaceSignUp(ctx *context.Context, form auth.RegisterForm) {
-	// swagger:operation POST /user/kitspace/sign_up auth RegisterForm
+	// swagger:operation POST /user/kitspace/sign_up
 	// ---
 	// summary: Create a user
 	// consumes:
@@ -80,7 +80,7 @@ func KitspaceSignUp(ctx *context.Context, form auth.RegisterForm) {
 
 // KitspaceSignIn custom sign-in compatible with Kitspace architecture
 func KitspaceSignIn(ctx *context.Context, form auth.SignInForm) {
-	// swagger:operation POST /user/kitspace/sign_in auth SignInForm
+	// swagger:operation POST /user/kitspace/sign_in
 	// ---
 	// summary: login a user
 	// consumes:
