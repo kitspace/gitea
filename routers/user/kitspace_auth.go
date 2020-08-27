@@ -79,7 +79,32 @@ func KitspaceSignUp(ctx *context.Context, form auth.RegisterForm) {
 	}
 }
 
+// KitspaceSignIn custom sign-in compatible with Kitspace architecture
 func KitspaceSignIn(ctx *context.Context, form auth.SignInForm) {
+	// swagger:operation POST /user/kitspace/sign_in auth SignInForm
+	// ---
+	// summary: login a user
+	// consumes:
+	// - application/json
+	// produces:
+	// - application/json
+	// parameters:
+	// - name: body
+	//   in: body
+	//   schema:
+	//     "$ref": "#/definitions/SignInForm"
+	// responses:
+	//   "200":
+	//     "$ref": "success"
+	//   "404":
+	//     "$ref": "#/response/forbidden"
+	//   "404":
+	//     "$ref": "#/responses/notFound"
+	//	 "409":
+	//     "$ref": "#/response/error
+	//   "422":
+	//     "$ref": "#/responses/validationError"
+
 	u, err := models.UserSignIn(form.UserName, form.Password)
 
 	if err != nil {
