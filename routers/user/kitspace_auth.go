@@ -11,7 +11,8 @@ import (
 	"code.gitea.io/gitea/modules/log"
 	"code.gitea.io/gitea/modules/password"
 	"code.gitea.io/gitea/modules/setting"
-)
+	"code.gitea.io/gitea/modules/timeutil"
+	"code.gitea.io/gitea/services/mailer")
 
 // KitspaceSignUp custom sign-up compatible with Kitspace architecture
 func KitspaceSignUp(ctx *context.Context, form auth.RegisterForm) {
@@ -70,12 +71,31 @@ func KitspaceSignUp(ctx *context.Context, form auth.RegisterForm) {
 		return
 	} else {
 		log.Trace("Account created: %s", u.Name)
+	}
+
+	// Send confirmation email
+	if setting.Service.RegisterEmailConfirm && u.ID > 1 {
+		mailer.SendActivateAccountMail(ctx.Locale, u)
+
+		response := make(map[string]string)
+		response["email"] = u.Email
+		response["ActiveCodeLives"] = timeutil.MinutesToFriendly(
+			setting.Service.ActiveCodeLives,
+			ctx.Locale.Language(),
+		)
+
+		if err := ctx.Cache.Put("MailResendLimit_"+u.LowerName, u.LowerName, 180); err != nil {
+			log.Error("Set cache(MailResendLimit) fail: %v", err)
+		}
+
+		ctx.JSON(http.StatusOK, response)
+	} else {
 		response := make(map[string]bool)
 		response["IsRegisteredSuccessfully"] = true
 
 		ctx.JSON(http.StatusCreated, response)
-		return
 	}
+	return
 }
 
 // KitspaceSignIn custom sign-in compatible with Kitspace architecture
@@ -194,7 +214,7 @@ func handleKitspaceSignIn(ctx *context.Context, user *models.User, remember bool
 		return
 	}
 	response := make(map[string]bool)
-	response["LoggedInSuccessfully "] = true
+	response["LoggedInSuccessfully"] = true
 
 	ctx.JSON(http.StatusOK, response)
 	return
