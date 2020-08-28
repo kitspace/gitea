@@ -72,17 +72,17 @@ func KitspaceSignUp(ctx *context.Context, form auth.RegisterForm) {
 			response["error"] = "Conflict"
 			response["message"] = "Email is already used."
 
-			ctx.JSON(http.StatusConflict, "Email is already used.")
+			ctx.JSON(http.StatusConflict, response)
 		case models.IsErrNameReserved(err):
 			response["error"] = "Conflict"
 			response["message"] = "Name is reserved."
 
-			ctx.JSON(http.StatusConflict, "Name is reserved.")
+			ctx.JSON(http.StatusConflict, response)
 		case models.IsErrNamePatternNotAllowed(err):
 			response["error"] = "UnprocessableEntity"
 			response["message"] = "This name pattern isn't allowed."
 
-			ctx.JSON(http.StatusUnprocessableEntity, "This name pattern isn't allowed.")
+			ctx.JSON(http.StatusUnprocessableEntity, response)
 		default:
 			ctx.ServerError("Signup", err)
 		}
