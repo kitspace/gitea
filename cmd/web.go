@@ -119,6 +119,9 @@ func runWeb(ctx *cli.Context) error {
 
 	// Set up Macaron
 	m := routes.NewMacaron()
+
+	routes.RegisterKitspaceRoutes(m)
+
 	routes.RegisterRoutes(m)
 
 	// Flag for port number in case first time run conflict.
