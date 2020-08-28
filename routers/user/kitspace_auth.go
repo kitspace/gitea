@@ -36,14 +36,21 @@ func KitspaceSignUp(ctx *context.Context, form auth.RegisterForm) {
 	//     "$ref": "#/response/error
 	//   "422":
 	//     "$ref": "#/responses/validationError"
+	response := make(map[string]string)
 
 	if len(form.Password) < setting.MinPasswordLength {
-		ctx.JSON(http.StatusUnprocessableEntity, "Password is too short.")
+		response["error"] = "UnprocessableEntity"
+		response["message"] = "Password is too short."
+
+		ctx.JSON(http.StatusUnprocessableEntity, response)
 		return
 	}
 
 	if !password.IsComplexEnough(form.Password) {
-		ctx.JSON(http.StatusUnprocessableEntity, "Password isn't complex enough")
+		response["error"] = "UnprocessableEntity"
+		response["message"] = "Password isn't complex enough."
+
+		ctx.JSON(http.StatusUnprocessableEntity, response)
 		return
 	}
 
@@ -57,12 +64,24 @@ func KitspaceSignUp(ctx *context.Context, form auth.RegisterForm) {
 	if err := models.CreateUser(u); err != nil {
 		switch {
 		case models.IsErrUserAlreadyExist(err):
-			ctx.JSON(http.StatusConflict, "User already exists.")
+			response["error"] = "Conflict"
+			response["message"] = "User already exists."
+
+			ctx.JSON(http.StatusConflict, response)
 		case models.IsErrEmailAlreadyUsed(err):
+			response["error"] = "Conflict"
+			response["message"] = "Email is already used."
+
 			ctx.JSON(http.StatusConflict, "Email is already used.")
 		case models.IsErrNameReserved(err):
+			response["error"] = "Conflict"
+			response["message"] = "Name is reserved."
+
 			ctx.JSON(http.StatusConflict, "Name is reserved.")
 		case models.IsErrNamePatternNotAllowed(err):
+			response["error"] = "UnprocessableEntity"
+			response["message"] = "This name pattern isn't allowed."
+
 			ctx.JSON(http.StatusUnprocessableEntity, "This name pattern isn't allowed.")
 		default:
 			ctx.ServerError("Signup", err)
