@@ -221,6 +221,7 @@ func NewMacaron() *macaron.Macaron {
 		Header:         "X-Csrf-Token",
 		CookieDomain:   setting.SessionConfig.Domain,
 		CookiePath:     setting.AppSubURL,
+		SetHeader:      true,
 	}))
 	m.Use(toolbox.Toolboxer(m, toolbox.Options{
 		HealthCheckFuncs: []*toolbox.HealthCheckFuncDesc{
@@ -237,6 +238,10 @@ func NewMacaron() *macaron.Macaron {
 	m.Use(context.Recovery())
 	m.SetAutoHead(true)
 	return m
+}
+
+func RegisterKitspaceRoutes(m *macaron.Macaron) {
+	m.Get("/__kitspace/?*", routers.Kitspace)
 }
 
 // RegisterRoutes routes routes to Macaron
