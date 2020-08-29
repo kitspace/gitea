@@ -41,6 +41,7 @@ func KitspaceSignUp(ctx *context.Context, form auth.RegisterForm) {
 		allowedDomain := setting.CORSConfig.AllowDomain[0]
 
 		ctx.Resp.Header().Set("Access-Control-Allow-Origin", allowedDomain)
+		ctx.Resp.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization, User-Agent")
 	}
 
 	response := make(map[string]string)
