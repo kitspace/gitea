@@ -255,6 +255,18 @@ func RegisterRoutes(m *macaron.Macaron) {
 	bind := binding.Bind
 	validation.AddBindingRules()
 
+	var handlers []macaron.Handler
+	if setting.CORSConfig.Enabled {
+		handlers = append(handlers, cors.CORS(cors.Options{
+			Scheme:           setting.CORSConfig.Scheme,
+			AllowDomain:      setting.CORSConfig.AllowDomain,
+			AllowSubdomain:   setting.CORSConfig.AllowSubdomain,
+			Methods:          setting.CORSConfig.Methods,
+			MaxAgeSeconds:    int(setting.CORSConfig.MaxAge.Seconds()),
+			AllowCredentials: setting.CORSConfig.AllowCredentials,
+		}))
+	}
+
 	openIDSignInEnabled := func(ctx *context.Context) {
 		if !setting.Service.EnableOpenIDSignIn {
 			ctx.Error(403)
@@ -311,7 +323,7 @@ func RegisterRoutes(m *macaron.Macaron) {
 		m.Group("/kitspace", func() {
 			m.Post("/sign_up", bind(auth.RegisterForm{}), user.KitspaceSignUp)
 			m.Post("/sign_in", bind(auth.SignInForm{}), user.KitspaceSignIn)
-		})
+		}, handlers...)
 
 		m.Get("/login", user.SignIn)
 		m.Post("/login", bindIgnErr(auth.SignInForm{}), user.SignInPost)
@@ -1047,22 +1059,10 @@ func RegisterRoutes(m *macaron.Macaron) {
 	if setting.API.EnableSwagger {
 		m.Get("/swagger.v1.json", templates.JSONRenderer(), routers.SwaggerV1Json)
 	}
-
-	var handlers []macaron.Handler
-	if setting.CORSConfig.Enabled {
-		handlers = append(handlers, cors.CORS(cors.Options{
-			Scheme:           setting.CORSConfig.Scheme,
-			AllowDomain:      setting.CORSConfig.AllowDomain,
-			AllowSubdomain:   setting.CORSConfig.AllowSubdomain,
-			Methods:          setting.CORSConfig.Methods,
-			MaxAgeSeconds:    int(setting.CORSConfig.MaxAge.Seconds()),
-			AllowCredentials: setting.CORSConfig.AllowCredentials,
-		}))
-	}
-	handlers = append(handlers, ignSignIn)
+	apiHandlers := append(handlers, ignSignIn)
 	m.Group("/api", func() {
 		apiv1.RegisterRoutes(m)
-	}, handlers...)
+	}, apiHandlers...)
 
 	m.Group("/api/internal", func() {
 		// package name internal is ideal but Golang is not allowed, so we use private as package name.
