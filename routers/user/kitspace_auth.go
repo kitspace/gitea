@@ -108,8 +108,11 @@ func KitspaceSignUp(ctx *context.Context, form auth.RegisterForm) {
 
 		ctx.JSON(http.StatusOK, response)
 	} else {
-		response := make(map[string]bool)
-		response["IsRegisteredSuccessfully"] = true
+		// make the mock response similar to the response when mailing works
+		response :=  map[string]string{
+			"email": u.Email,
+			"ActiveCodeLives": timeutil.MinutesToFriendly(setting.Service.ActiveCodeLives, ctx.Locale.Language()),
+		}
 
 		ctx.JSON(http.StatusCreated, response)
 	}
