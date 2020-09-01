@@ -36,17 +36,6 @@ func KitspaceSignUp(ctx *context.Context, form auth.RegisterForm) {
 	//     "$ref": "#/response/error
 	//   "422":
 	//     "$ref": "#/responses/validationError"
-
-	if len(setting.CORSConfig.AllowDomain) > 0 {
-		allowedDomain := setting.CORSConfig.AllowDomain[0]
-
-		ctx.Resp.Header().Set("Access-Control-Allow-Origin", allowedDomain)
-		ctx.Resp.Header().Set(
-			"Access-Control-Allow-Headers",
-			"Content-Type, Authorization, User-Agent, Cache-Control, pragma")
-		ctx.Resp.Header().Set("Access-Control-Expose-Headers", "Authorization")
-	}
-
 	response := make(map[string]string)
 
 	if len(form.Password) < setting.MinPasswordLength {
