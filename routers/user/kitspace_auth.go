@@ -147,22 +147,38 @@ func KitspaceSignIn(ctx *context.Context, form auth.SignInForm) {
 
 	u, err := models.UserSignIn(form.UserName, form.Password)
 
+	response := make(map[string]string)
 	if err != nil {
 		switch {
 		case models.IsErrUserNotExist(err):
-			ctx.JSON(http.StatusNotFound, "Wrong username or password.")
+			response["error"] = "Not Found"
+			response["message"] = "Wrong username or password."
+
+			ctx.JSON(http.StatusNotFound, response)
 			log.Info("Failed authentication attempt for %s from %s", form.UserName, ctx.RemoteAddr())
 		case models.IsErrEmailAlreadyUsed(err):
-			ctx.JSON(http.StatusConflict, "This email has already been used.")
+			response["error"] = "Conflict"
+			response["message"] = "This email has already been used."
+
+			ctx.JSON(http.StatusConflict, response)
 			log.Info("Failed authentication attempt for %s from %s", form.UserName, ctx.RemoteAddr())
 		case models.IsErrUserProhibitLogin(err):
-			ctx.JSON(http.StatusForbidden, "Prohibited login")
+			response["error"] = "Prohibited"
+			response["message"] = "Prohibited login."
+
+			ctx.JSON(http.StatusForbidden, response)
 			log.Info("Failed authentication attempt for %s from %s", form.UserName, ctx.RemoteAddr())
 		case models.IsErrUserInactive(err):
 			if setting.Service.RegisterEmailConfirm {
-				ctx.JSON(http.StatusOK, "Activate your account.")
+				response["error"] = "ActivationRequired"
+				response["message"] = "Activate your account."
+
+				ctx.JSON(http.StatusOK, response)
 			} else {
-				ctx.JSON(http.StatusForbidden, "Prohibited login")
+				response["error"] = "Prohibited"
+				response["message"] = "Prohibited login"
+
+				ctx.JSON(http.StatusForbidden, response)
 				log.Info("Failed authentication attempt for %s from %s", form.UserName, ctx.RemoteAddr())
 			}
 		default:
@@ -231,7 +247,7 @@ func handleKitspaceSignIn(ctx *context.Context, user *models.User, remember bool
 
 	if err := models.UpdateUserCols(user, "last_login_unix"); err != nil {
 		ctx.ServerError("UpdateUserCols", err)
-		ctx.JSON(http.StatusPermanentRedirect, "")
+		ctx.JSON(http.StatusPermanentRedirect, map[string]string{"error": "Error", "message": ""})
 		return
 	}
 	response := make(map[string]bool)
