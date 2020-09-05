@@ -17,7 +17,6 @@ var (
 		Scheme              string
 		AllowDomain         []string
 		AllowSubdomain      bool
-		KitspaceAllowDomain string
 		Methods             []string
 		MaxAge              time.Duration
 		AllowCredentials    bool
