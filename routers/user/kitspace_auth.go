@@ -1,17 +1,20 @@
 package user
 
 import (
+	"fmt"
 	"net/http"
 
 	"code.gitea.io/gitea/models"
 	"code.gitea.io/gitea/modules/auth"
 	"code.gitea.io/gitea/modules/base"
 	"code.gitea.io/gitea/modules/context"
+	"code.gitea.io/gitea/modules/eventsource"
 	"code.gitea.io/gitea/modules/log"
 	"code.gitea.io/gitea/modules/password"
 	"code.gitea.io/gitea/modules/setting"
 	"code.gitea.io/gitea/modules/timeutil"
-	"code.gitea.io/gitea/services/mailer")
+	"code.gitea.io/gitea/services/mailer"
+	)
 
 // KitspaceSignUp custom sign-up compatible with Kitspace architecture
 func KitspaceSignUp(ctx *context.Context, form auth.RegisterForm) {
@@ -223,6 +226,15 @@ func handleKitspaceSignIn(ctx *context.Context, user *models.User, remember bool
 		log.Error("Unable to store session: %v", err)
 	}
 
+	if len(user.Language) == 0 {
+		user.Language = ctx.Locale.Language()
+
+		if err := models.UpdateUserCols(user, "language"); err != nil {
+			log.Error(fmt.Sprintf("Error updating user language [user: %d, locale: %s]", user.ID, user.Language))
+			return
+		}
+	}
+
 	ctx.SetCookie(
 		"lang",
 		user.Language,
@@ -255,4 +267,54 @@ func handleKitspaceSignIn(ctx *context.Context, user *models.User, remember bool
 
 	ctx.JSON(http.StatusOK, response)
 	return
+}
+
+// KitspaceSignOut sign out from login status
+func KitspaceSignOut(ctx *context.Context) {
+	if ctx.User != nil {
+		eventsource.GetManager().SendMessageBlocking(ctx.User.ID, &eventsource.Event{
+			Name: "logout",
+			Data: ctx.Session.ID(),
+		})
+	}
+
+	handleSignOut(ctx)
+
+	response := map[string]bool {"LoggedOutSuccessfully": true}
+	ctx.JSON(http.StatusOK, response)
+	return
+}
+
+// HandleSignOut resets the session and clear the cookies
+func handleSignOut(ctx *context.Context) {
+	_ = ctx.Session.Flush()
+	_ = ctx.Session.Destroy(ctx.Context)
+	ctx.SetCookie(
+		setting.CookieUserName,
+		"",
+		-1,
+		setting.AppSubURL,
+		setting.SessionConfig.Domain,
+		setting.SessionConfig.Secure,
+		true)
+	ctx.SetCookie(setting.CookieRememberName,
+		"", -1,
+		setting.AppSubURL,
+		setting.SessionConfig.Domain,
+		setting.SessionConfig.Secure,
+		true)
+	ctx.SetCookie(setting.CSRFCookieName,
+		"",
+		-1,
+		setting.AppSubURL,
+		setting.SessionConfig.Domain,
+		setting.SessionConfig.Secure,
+		true)
+	ctx.SetCookie("lang",
+		"",
+		-1,
+		setting.AppSubURL,
+		setting.SessionConfig.Domain,
+		setting.SessionConfig.Secure,
+		true) // Setting the lang cookie will trigger the middleware to reset the language ot previous state.
 }
