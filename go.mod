@@ -23,6 +23,7 @@ require (
 	github.com/alecthomas/chroma v0.8.0
 	github.com/bgentry/speakeasy v0.1.0 // indirect
 	github.com/blevesearch/bleve v1.0.7
+	github.com/cespare/reflex v0.3.0 // indirect
 	github.com/couchbase/gomemcached v0.0.0-20191004160342-7b5da2ec40b2 // indirect
 	github.com/cznic/b v0.0.0-20181122101859-a26611c4d92d // indirect
 	github.com/cznic/mathutil v0.0.0-20181122101859-297441e03548 // indirect
@@ -59,7 +60,7 @@ require (
 	github.com/issue9/identicon v1.0.1
 	github.com/jaytaylor/html2text v0.0.0-20160923191438-8fb95d837f7d
 	github.com/jmhodges/levigo v1.0.0 // indirect
-	github.com/kballard/go-shellquote v0.0.0-20170619183022-cd60e84ee657
+	github.com/kballard/go-shellquote v0.0.0-20180428030007-95032a82bc51
 	github.com/keybase/go-crypto v0.0.0-20200123153347-de78d2cb44f4
 	github.com/klauspost/compress v1.10.2
 	github.com/lafriks/xormstore v1.3.2
