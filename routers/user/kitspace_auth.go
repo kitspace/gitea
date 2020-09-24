@@ -1,12 +1,10 @@
 package user
 
 import (
-	"fmt"
 	"net/http"
 
 	"code.gitea.io/gitea/models"
 	"code.gitea.io/gitea/modules/auth"
-	"code.gitea.io/gitea/modules/base"
 	"code.gitea.io/gitea/modules/context"
 	"code.gitea.io/gitea/modules/eventsource"
 	"code.gitea.io/gitea/modules/log"
@@ -14,7 +12,7 @@ import (
 	"code.gitea.io/gitea/modules/setting"
 	"code.gitea.io/gitea/modules/timeutil"
 	"code.gitea.io/gitea/services/mailer"
-	)
+)
 
 // KitspaceSignUp custom sign-up compatible with Kitspace architecture
 func KitspaceSignUp(ctx *context.Context, form auth.RegisterForm) {
@@ -112,8 +110,8 @@ func KitspaceSignUp(ctx *context.Context, form auth.RegisterForm) {
 		ctx.JSON(http.StatusOK, response)
 	} else {
 		// make the mock response similar to the response when mailing works
-		response :=  map[string]string{
-			"email": u.Email,
+		response := map[string]string{
+			"email":           u.Email,
 			"ActiveCodeLives": timeutil.MinutesToFriendly(setting.Service.ActiveCodeLives, ctx.Locale.Language()),
 		}
 
@@ -189,87 +187,12 @@ func KitspaceSignIn(ctx *context.Context, form auth.SignInForm) {
 		}
 		return
 	}
-	handleKitspaceSignIn(ctx, u, form.Remember)
-}
+	handleSignInFull(ctx, u, form.Remember, false)
 
-func handleKitspaceSignIn(ctx *context.Context, user *models.User, remember bool) {
-	if remember {
-		days := 86400 * setting.LogInRememberDays
-		ctx.SetCookie(
-			setting.CookieUserName,
-			user.Name,
-			days,
-			setting.AppSubURL,
-			setting.SessionConfig.Domain,
-			setting.SessionConfig.Secure,
-			true)
-		ctx.SetSuperSecureCookie(
-			base.EncodeMD5(user.Rands+user.Passwd),
-			setting.CookieRememberName,
-			user.Name,
-			days,
-			setting.AppSubURL,
-			setting.SessionConfig.Domain,
-			setting.SessionConfig.Secure,
-			true)
-	}
-
-	if err := ctx.Session.Set("uid", user.ID); err != nil {
-		log.Error("Error setting uid %s session: %v", user.Name, err)
-	}
-
-	if err := ctx.Session.Set("uname", user.Name); err != nil {
-		log.Error("Error setting uname")
-	}
-
-	if err := ctx.Session.Release(); err != nil {
-		log.Error("Unable to store session: %v", err)
-	}
-
-	if len(user.Language) == 0 {
-		user.Language = ctx.Locale.Language()
-
-		if err := models.UpdateUserCols(user, "language"); err != nil {
-			log.Error(fmt.Sprintf("Error updating user language [user: %d, locale: %s]", user.ID, user.Language))
-			return
-		}
-	}
-
-	ctx.SetCookie(
-		"lang",
-		user.Language,
-		nil,
-		setting.AppSubURL,
-		setting.SessionConfig.Domain,
-		setting.SessionConfig.Secure,
-		true)
-
-	// Clear whatever CSRF has right now, force to generate a new one
-	ctx.SetCookie(
-		setting.CSRFCookieName,
-		"",
-		-1,
-		setting.AppSubURL,
-		setting.SessionConfig.Domain,
-		setting.SessionConfig.Secure,
-		true)
-
-	// Register last login
-	user.SetLastLogin()
-
-	if err := models.UpdateUserCols(user, "last_login_unix"); err != nil {
-		ctx.ServerError("UpdateUserCols", err)
-		ctx.JSON(http.StatusPermanentRedirect, map[string]string{"error": "Error", "message": ""})
-		return
-	}
-	response := make(map[string]bool)
-	response["LoggedInSuccessfully"] = true
-
+	response["LoggedInSuccessfully"] = u.Name
 	ctx.JSON(http.StatusOK, response)
-	return
 }
 
-// KitspaceSignOut sign out from login status
 func KitspaceSignOut(ctx *context.Context) {
 	if ctx.User != nil {
 		eventsource.GetManager().SendMessageBlocking(ctx.User.ID, &eventsource.Event{
@@ -280,7 +203,7 @@ func KitspaceSignOut(ctx *context.Context) {
 
 	handleSignOut(ctx)
 
-	response := map[string]bool {"LoggedOutSuccessfully": true}
+	response := map[string]bool{"LoggedOutSuccessfully": true}
 	ctx.JSON(http.StatusOK, response)
 	return
 }
