@@ -6,7 +6,6 @@ import (
 	"code.gitea.io/gitea/models"
 	"code.gitea.io/gitea/modules/auth"
 	"code.gitea.io/gitea/modules/context"
-	"code.gitea.io/gitea/modules/eventsource"
 	"code.gitea.io/gitea/modules/log"
 	"code.gitea.io/gitea/modules/password"
 	"code.gitea.io/gitea/modules/setting"
@@ -191,59 +190,4 @@ func KitspaceSignIn(ctx *context.Context, form auth.SignInForm) {
 
 	response["LoggedInSuccessfully"] = u.Name
 	ctx.JSON(http.StatusOK, response)
-}
-
-func KitspaceSignOut(ctx *context.Context) {
-	if ctx.User != nil {
-		eventsource.GetManager().SendMessageBlocking(ctx.User.ID, &eventsource.Event{
-			Name: "logout",
-			Data: ctx.Session.ID(),
-		})
-	}
-
-	handleSignOut(ctx)
-	return
-}
-
-// HandleSignOut resets the session and clear the cookies
-func handleSignOut(ctx *context.Context) {
-	_ = ctx.Session.Flush()
-	_ = ctx.Session.Destroy(ctx.Context)
-	ctx.SetCookie(
-		setting.CookieUserName,
-		"",
-		-1,
-		setting.AppSubURL,
-		setting.SessionConfig.Domain,
-		setting.SessionConfig.Secure,
-		true)
-	ctx.SetCookie(
-		setting.CookieRememberName,
-		"",
-		-1,
-		setting.AppSubURL,
-		setting.SessionConfig.Domain,
-		setting.SessionConfig.Secure,
-		true)
-	ctx.SetCookie(
-		setting.CSRFCookieName,
-		"",
-		-1,
-		setting.AppSubURL,
-		setting.SessionConfig.Domain,
-		setting.SessionConfig.Secure,
-		true)
-	ctx.SetCookie(
-		"lang",
-		"",
-		-1,
-		setting.AppSubURL,
-		setting.SessionConfig.Domain,
-		setting.SessionConfig.Secure,
-		true) // Setting the lang cookie will trigger the middleware to reset the language ot previous state.
-	ctx.SetCookie(
-		"redirect_to",
-		"",
-		-1,
-		setting.AppSubURL)
 }
