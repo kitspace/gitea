@@ -202,10 +202,7 @@ func KitspaceSignOut(ctx *context.Context) {
 	}
 
 	handleSignOut(ctx)
-
-	response := map[string]bool{"LoggedOutSuccessfully": true}
-	ctx.JSON(http.StatusOK, response)
-	return
+	ctx.Redirect(setting.AppSubURL + "/")
 }
 
 // HandleSignOut resets the session and clear the cookies
