@@ -202,7 +202,7 @@ func KitspaceSignOut(ctx *context.Context) {
 	}
 
 	handleSignOut(ctx)
-	ctx.Redirect(setting.AppSubURL + "/")
+	return
 }
 
 // HandleSignOut resets the session and clear the cookies
@@ -217,24 +217,33 @@ func handleSignOut(ctx *context.Context) {
 		setting.SessionConfig.Domain,
 		setting.SessionConfig.Secure,
 		true)
-	ctx.SetCookie(setting.CookieRememberName,
-		"", -1,
-		setting.AppSubURL,
-		setting.SessionConfig.Domain,
-		setting.SessionConfig.Secure,
-		true)
-	ctx.SetCookie(setting.CSRFCookieName,
+	ctx.SetCookie(
+		setting.CookieRememberName,
 		"",
 		-1,
 		setting.AppSubURL,
 		setting.SessionConfig.Domain,
 		setting.SessionConfig.Secure,
 		true)
-	ctx.SetCookie("lang",
+	ctx.SetCookie(
+		setting.CSRFCookieName,
+		"",
+		-1,
+		setting.AppSubURL,
+		setting.SessionConfig.Domain,
+		setting.SessionConfig.Secure,
+		true)
+	ctx.SetCookie(
+		"lang",
 		"",
 		-1,
 		setting.AppSubURL,
 		setting.SessionConfig.Domain,
 		setting.SessionConfig.Secure,
 		true) // Setting the lang cookie will trigger the middleware to reset the language ot previous state.
+	ctx.SetCookie(
+		"redirect_to",
+		"",
+		-1,
+		setting.AppSubURL)
 }
