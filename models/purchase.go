@@ -49,6 +49,6 @@ func IsStripePriceID(name string) error {
 }
 
 // CreateRepository creates a repository for the user/organization.
-func CreatePurchase(ctx DBContext, options CreatePurchaseOptions) (err error) {
+func CreatePurchase(ctx DBContext, options CreatePurchaseOptions) (Purchase, err error) {
 	return nil
 }

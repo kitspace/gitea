@@ -9,7 +9,7 @@ import (
 )
 
 // CreatePurchase creates a purchase for a user
-func CreatePurchase() (*models.Purchase, error) {
+func CreatePurchase(opts models.CreatePurchaseOptions) (*models.Purchase, error) {
 	if err := models.WithTx(func(ctx models.DBContext) error {
 		return nil
 	}); err != nil {
