@@ -25,6 +25,9 @@ func (opts ListOptions) getPaginatedSession() *xorm.Session {
 func (opts ListOptions) setSessionPagination(sess *xorm.Session) *xorm.Session {
 	opts.setDefaultValues()
 
+	if opts.PageSize <= 0 {
+		return sess
+	}
 	return sess.Limit(opts.PageSize, (opts.Page-1)*opts.PageSize)
 }
 
@@ -35,7 +38,10 @@ func (opts ListOptions) setEnginePagination(e Engine) Engine {
 }
 
 func (opts ListOptions) setDefaultValues() {
-	if opts.PageSize <= 0 || opts.PageSize > setting.API.MaxResponseItems {
+	if opts.PageSize <= 0 {
+		opts.PageSize = setting.API.DefaultPagingNum
+	}
+	if opts.PageSize > setting.API.MaxResponseItems {
 		opts.PageSize = setting.API.MaxResponseItems
 	}
 	if opts.Page <= 0 {

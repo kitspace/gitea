@@ -16,6 +16,7 @@ import (
 	"code.gitea.io/gitea/models"
 	"code.gitea.io/gitea/modules/git"
 	"code.gitea.io/gitea/modules/log"
+	"code.gitea.io/gitea/modules/util"
 
 	"github.com/huandu/xstrings"
 )
@@ -113,12 +114,13 @@ func generateRepoCommit(repo, templateRepo, generateRepo *models.Repository, tmp
 	// Clone to temporary path and do the init commit.
 	templateRepoPath := templateRepo.RepoPath()
 	if err := git.Clone(templateRepoPath, tmpDir, git.CloneRepoOptions{
-		Depth: 1,
+		Depth:  1,
+		Branch: templateRepo.DefaultBranch,
 	}); err != nil {
 		return fmt.Errorf("git clone: %v", err)
 	}
 
-	if err := os.RemoveAll(path.Join(tmpDir, ".git")); err != nil {
+	if err := util.RemoveAll(path.Join(tmpDir, ".git")); err != nil {
 		return fmt.Errorf("remove git dir: %v", err)
 	}
 
@@ -129,7 +131,7 @@ func generateRepoCommit(repo, templateRepo, generateRepo *models.Repository, tmp
 	}
 
 	if gt != nil {
-		if err := os.Remove(gt.Path); err != nil {
+		if err := util.Remove(gt.Path); err != nil {
 			return fmt.Errorf("remove .giteatemplate: %v", err)
 		}
 
@@ -180,7 +182,7 @@ func generateRepoCommit(repo, templateRepo, generateRepo *models.Repository, tmp
 		return fmt.Errorf("git remote add: %v", err)
 	}
 
-	return initRepoCommit(tmpDir, repo, repo.Owner)
+	return initRepoCommit(tmpDir, repo, repo.Owner, templateRepo.DefaultBranch)
 }
 
 func generateGitContent(ctx models.DBContext, repo, templateRepo, generateRepo *models.Repository) (err error) {
@@ -190,7 +192,7 @@ func generateGitContent(ctx models.DBContext, repo, templateRepo, generateRepo *
 	}
 
 	defer func() {
-		if err := os.RemoveAll(tmpDir); err != nil {
+		if err := util.RemoveAll(tmpDir); err != nil {
 			log.Error("RemoveAll: %v", err)
 		}
 	}()
@@ -204,7 +206,7 @@ func generateGitContent(ctx models.DBContext, repo, templateRepo, generateRepo *
 		return fmt.Errorf("getRepositoryByID: %v", err)
 	}
 
-	repo.DefaultBranch = "master"
+	repo.DefaultBranch = templateRepo.DefaultBranch
 	if err = models.UpdateRepositoryCtx(ctx, repo, false); err != nil {
 		return fmt.Errorf("updateRepository: %v", err)
 	}

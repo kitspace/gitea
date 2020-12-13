@@ -80,7 +80,7 @@ func ServCommand(ctx *macaron.Context) {
 		KeyID:     keyID,
 	}
 
-	// Now because we're not translating things properly let's just default some Engish strings here
+	// Now because we're not translating things properly let's just default some English strings here
 	modeString := "read"
 	if mode > models.AccessModeRead {
 		modeString = "write to"
@@ -329,8 +329,27 @@ func ServCommand(ctx *macaron.Context) {
 		results.RepoID = repo.ID
 	}
 
-	// Finally if we're trying to touch the wiki we should init it
 	if results.IsWiki {
+		// Ensure the wiki is enabled before we allow access to it
+		if _, err := repo.GetUnit(models.UnitTypeWiki); err != nil {
+			if models.IsErrUnitTypeNotExist(err) {
+				ctx.JSON(http.StatusForbidden, map[string]interface{}{
+					"results": results,
+					"type":    "ErrForbidden",
+					"err":     "repository wiki is disabled",
+				})
+				return
+			}
+			log.Error("Failed to get the wiki unit in %-v Error: %v", repo, err)
+			ctx.JSON(http.StatusInternalServerError, map[string]interface{}{
+				"results": results,
+				"type":    "InternalServerError",
+				"err":     fmt.Sprintf("Failed to get the wiki unit in %s/%s Error: %v", ownerName, repoName, err),
+			})
+			return
+		}
+
+		// Finally if we're trying to touch the wiki we should init it
 		if err = wiki_service.InitWiki(repo); err != nil {
 			log.Error("Failed to initialize the wiki in %-v Error: %v", repo, err)
 			ctx.JSON(http.StatusInternalServerError, map[string]interface{}{

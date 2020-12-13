@@ -60,7 +60,7 @@ _Symbols used in table:_
 | Git LFS 2.0 | ✓ | ✘ | ✓ | ✓ | ✓ | ⁄ | ✓ |
 | Group Milestones | ✘ | ✘ | ✘ | ✓ | ✓ | ✘ | ✘ |
 | Granular user roles (Code, Issues, Wiki etc) | ✓ | ✘ | ✘ | ✓ | ✓ | ✘ | ✘ |
-| Verified Committer | ✘ | ✘ | ? | ✓ | ✓ | ✓ | ✘ |
+| Verified Committer | ⁄ | ✘ | ? | ✓ | ✓ | ✓ | ✘ |
 | GPG Signed Commits | ✓ | ✘ | ✓ | ✓ | ✓ | ✓ | ✓ |
 | Reject unsigned commits | [✓](https://github.com/go-gitea/gitea/pull/9708) | ✘ | ✓ | ✓ | ✓ | ✘ | ✓ |
 | Repository Activity page | ✓ | ✘ | ✓ | ✓ | ✓ | ✓ | ✓ |
@@ -84,7 +84,7 @@ _Symbols used in table:_
 | Comment reactions | ✓ | ✘ | ✓ | ✓ | ✓ | ✘ | ✘ |
 | Lock Discussion | ✓ | ✘ | ✓ | ✓ | ✓ | ✘ | ✘ |
 | Batch issue handling | ✓ | ✘ | ✓ | ✓ | ✓ | ✘ | ✘ |
-| Issue Boards | [✘](https://github.com/go-gitea/gitea/issues/3476) | ✘ | ✘ | ✓ | ✓ | ✘ | ✘ |
+| Issue Boards | [✓](https://github.com/go-gitea/gitea/pull/8346) | ✘ | ✘ | ✓ | ✓ | ✘ | ✘ |
 | Create new branches from issues | ✘ | ✘ | ✘ | ✓ | ✓ | ✘ | ✘ |
 | Issue search | ✓ | ✘ | ✓ | ✓ | ✓ | ✓ | ✘ |
 | Global issue search | [✘](https://github.com/go-gitea/gitea/issues/2434) | ✘ | ✓ | ✓ | ✓ | ✓ | ✘ |

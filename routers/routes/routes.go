@@ -27,6 +27,7 @@ import (
 	"code.gitea.io/gitea/routers/admin"
 	apiv1 "code.gitea.io/gitea/routers/api/v1"
 	"code.gitea.io/gitea/routers/dev"
+	"code.gitea.io/gitea/routers/events"
 	"code.gitea.io/gitea/routers/org"
 	"code.gitea.io/gitea/routers/private"
 	"code.gitea.io/gitea/routers/repo"
@@ -251,6 +252,7 @@ func RegisterRoutes(m *macaron.Macaron) {
 	reqSignOut := context.Toggle(&context.ToggleOptions{SignOutRequired: true})
 
 	bindIgnErr := binding.BindIgnErr
+	bind := binding.Bind
 	validation.AddBindingRules()
 
 	openIDSignInEnabled := func(ctx *context.Context) {
@@ -279,6 +281,7 @@ func RegisterRoutes(m *macaron.Macaron) {
 		ctx.Data["UnitWikiGlobalDisabled"] = models.UnitTypeWiki.UnitGlobalDisabled()
 		ctx.Data["UnitIssuesGlobalDisabled"] = models.UnitTypeIssues.UnitGlobalDisabled()
 		ctx.Data["UnitPullsGlobalDisabled"] = models.UnitTypePullRequests.UnitGlobalDisabled()
+		ctx.Data["UnitProjectsGlobalDisabled"] = models.UnitTypeProjects.UnitGlobalDisabled()
 	})
 
 	// FIXME: not all routes need go through same middlewares.
@@ -305,6 +308,12 @@ func RegisterRoutes(m *macaron.Macaron) {
 
 	// ***** START: User *****
 	m.Group("/user", func() {
+		m.Group("/kitspace", func() {
+			m.Post("/sign_up", bind(auth.RegisterForm{}), user.KitspaceSignUp)
+			m.Post("/sign_in", bind(auth.SignInForm{}), user.KitspaceSignIn)
+			m.Post("/sign_out", user.KitspaceSignOut)
+		})
+
 		m.Get("/login", user.SignIn)
 		m.Post("/login", bindIgnErr(auth.SignInForm{}), user.SignInPost)
 		m.Group("", func() {
@@ -344,6 +353,8 @@ func RegisterRoutes(m *macaron.Macaron) {
 
 		})
 	}, reqSignOut)
+
+	m.Any("/user/events", reqSignIn, events.Events)
 
 	m.Group("/login/oauth", func() {
 		m.Get("/authorize", bindIgnErr(auth.AuthorizationForm{}), user.AuthorizeOAuth)
@@ -418,15 +429,18 @@ func RegisterRoutes(m *macaron.Macaron) {
 		m.Post("/recover_account", user.ResetPasswdPost)
 		m.Get("/forgot_password", user.ForgotPasswd)
 		m.Post("/forgot_password", user.ForgotPasswdPost)
-		m.Get("/logout", user.SignOut)
+		m.Post("/logout", user.SignOut)
 	})
 	// ***** END: User *****
+
+	m.Get("/avatar/:hash", user.AvatarByEmailHash)
 
 	adminReq := context.Toggle(&context.ToggleOptions{SignInRequired: true, AdminRequired: true})
 
 	// ***** START: Admin *****
 	m.Group("/admin", func() {
 		m.Get("", adminReq, admin.Dashboard)
+		m.Post("", adminReq, bindIgnErr(auth.AdminDashboardForm{}), admin.DashboardPost)
 		m.Get("/config", admin.Config)
 		m.Post("/config/test_mail", admin.SendTestMail)
 		m.Group("/monitor", func() {
@@ -448,6 +462,11 @@ func RegisterRoutes(m *macaron.Macaron) {
 			m.Post("/:userid/delete", admin.DeleteUser)
 		})
 
+		m.Group("/emails", func() {
+			m.Get("", admin.Emails)
+			m.Post("/activate", admin.ActivateEmail)
+		})
+
 		m.Group("/orgs", func() {
 			m.Get("", admin.Organizations)
 		})
@@ -457,16 +476,17 @@ func RegisterRoutes(m *macaron.Macaron) {
 			m.Post("/delete", admin.DeleteRepo)
 		})
 
-		m.Group("/hooks", func() {
-			m.Get("", admin.DefaultWebhooks)
-			m.Post("/delete", admin.DeleteDefaultWebhook)
+		m.Group("/^:configType(hooks|system-hooks)$", func() {
+			m.Get("", admin.DefaultOrSystemWebhooks)
+			m.Post("/delete", admin.DeleteDefaultOrSystemWebhook)
 			m.Get("/:type/new", repo.WebhooksNew)
-			m.Post("/gitea/new", bindIgnErr(auth.NewWebhookForm{}), repo.WebHooksNewPost)
+			m.Post("/gitea/new", bindIgnErr(auth.NewWebhookForm{}), repo.GiteaHooksNewPost)
 			m.Post("/gogs/new", bindIgnErr(auth.NewGogshookForm{}), repo.GogsHooksNewPost)
 			m.Post("/slack/new", bindIgnErr(auth.NewSlackHookForm{}), repo.SlackHooksNewPost)
 			m.Post("/discord/new", bindIgnErr(auth.NewDiscordHookForm{}), repo.DiscordHooksNewPost)
 			m.Post("/dingtalk/new", bindIgnErr(auth.NewDingtalkHookForm{}), repo.DingtalkHooksNewPost)
 			m.Post("/telegram/new", bindIgnErr(auth.NewTelegramHookForm{}), repo.TelegramHooksNewPost)
+			m.Post("/matrix/new", bindIgnErr(auth.NewMatrixHookForm{}), repo.MatrixHooksNewPost)
 			m.Post("/msteams/new", bindIgnErr(auth.NewMSTeamsHookForm{}), repo.MSTeamsHooksNewPost)
 			m.Post("/feishu/new", bindIgnErr(auth.NewFeishuHookForm{}), repo.FeishuHooksNewPost)
 			m.Get("/:id", repo.WebHooksEdit)
@@ -476,6 +496,7 @@ func RegisterRoutes(m *macaron.Macaron) {
 			m.Post("/discord/:id", bindIgnErr(auth.NewDiscordHookForm{}), repo.DiscordHooksEditPost)
 			m.Post("/dingtalk/:id", bindIgnErr(auth.NewDingtalkHookForm{}), repo.DingtalkHooksEditPost)
 			m.Post("/telegram/:id", bindIgnErr(auth.NewTelegramHookForm{}), repo.TelegramHooksEditPost)
+			m.Post("/matrix/:id", bindIgnErr(auth.NewMatrixHookForm{}), repo.MatrixHooksEditPost)
 			m.Post("/msteams/:id", bindIgnErr(auth.NewMSTeamsHookForm{}), repo.MSTeamsHooksEditPost)
 			m.Post("/feishu/:id", bindIgnErr(auth.NewFeishuHookForm{}), repo.FeishuHooksEditPost)
 		})
@@ -491,7 +512,7 @@ func RegisterRoutes(m *macaron.Macaron) {
 		m.Group("/notices", func() {
 			m.Get("", admin.Notices)
 			m.Post("/delete", admin.DeleteNotices)
-			m.Get("/empty", admin.EmptyNotices)
+			m.Post("/empty", admin.EmptyNotices)
 		})
 	}, adminReq)
 	// ***** END: Admin *****
@@ -522,10 +543,11 @@ func RegisterRoutes(m *macaron.Macaron) {
 	reqRepoWikiWriter := context.RequireRepoWriter(models.UnitTypeWiki)
 	reqRepoIssueWriter := context.RequireRepoWriter(models.UnitTypeIssues)
 	reqRepoIssueReader := context.RequireRepoReader(models.UnitTypeIssues)
-	reqRepoPullsWriter := context.RequireRepoWriter(models.UnitTypePullRequests)
 	reqRepoPullsReader := context.RequireRepoReader(models.UnitTypePullRequests)
 	reqRepoIssuesOrPullsWriter := context.RequireRepoWriterOr(models.UnitTypeIssues, models.UnitTypePullRequests)
 	reqRepoIssuesOrPullsReader := context.RequireRepoReaderOr(models.UnitTypeIssues, models.UnitTypePullRequests)
+	reqRepoProjectsReader := context.RequireRepoReader(models.UnitTypeProjects)
+	reqRepoProjectsWriter := context.RequireRepoWriter(models.UnitTypeProjects)
 
 	// ***** START: Organization *****
 	m.Group("/org", func() {
@@ -568,12 +590,13 @@ func RegisterRoutes(m *macaron.Macaron) {
 					m.Get("", org.Webhooks)
 					m.Post("/delete", org.DeleteWebhook)
 					m.Get("/:type/new", repo.WebhooksNew)
-					m.Post("/gitea/new", bindIgnErr(auth.NewWebhookForm{}), repo.WebHooksNewPost)
+					m.Post("/gitea/new", bindIgnErr(auth.NewWebhookForm{}), repo.GiteaHooksNewPost)
 					m.Post("/gogs/new", bindIgnErr(auth.NewGogshookForm{}), repo.GogsHooksNewPost)
 					m.Post("/slack/new", bindIgnErr(auth.NewSlackHookForm{}), repo.SlackHooksNewPost)
 					m.Post("/discord/new", bindIgnErr(auth.NewDiscordHookForm{}), repo.DiscordHooksNewPost)
 					m.Post("/dingtalk/new", bindIgnErr(auth.NewDingtalkHookForm{}), repo.DingtalkHooksNewPost)
 					m.Post("/telegram/new", bindIgnErr(auth.NewTelegramHookForm{}), repo.TelegramHooksNewPost)
+					m.Post("/matrix/new", bindIgnErr(auth.NewMatrixHookForm{}), repo.MatrixHooksNewPost)
 					m.Post("/msteams/new", bindIgnErr(auth.NewMSTeamsHookForm{}), repo.MSTeamsHooksNewPost)
 					m.Post("/feishu/new", bindIgnErr(auth.NewFeishuHookForm{}), repo.FeishuHooksNewPost)
 					m.Get("/:id", repo.WebHooksEdit)
@@ -583,8 +606,17 @@ func RegisterRoutes(m *macaron.Macaron) {
 					m.Post("/discord/:id", bindIgnErr(auth.NewDiscordHookForm{}), repo.DiscordHooksEditPost)
 					m.Post("/dingtalk/:id", bindIgnErr(auth.NewDingtalkHookForm{}), repo.DingtalkHooksEditPost)
 					m.Post("/telegram/:id", bindIgnErr(auth.NewTelegramHookForm{}), repo.TelegramHooksEditPost)
+					m.Post("/matrix/:id", bindIgnErr(auth.NewMatrixHookForm{}), repo.MatrixHooksEditPost)
 					m.Post("/msteams/:id", bindIgnErr(auth.NewMSTeamsHookForm{}), repo.MSTeamsHooksEditPost)
 					m.Post("/feishu/:id", bindIgnErr(auth.NewFeishuHookForm{}), repo.FeishuHooksEditPost)
+				})
+
+				m.Group("/labels", func() {
+					m.Get("", org.RetrieveLabels, org.Labels)
+					m.Post("/new", bindIgnErr(auth.CreateLabelForm{}), org.NewLabel)
+					m.Post("/edit", bindIgnErr(auth.CreateLabelForm{}), org.UpdateLabel)
+					m.Post("/delete", org.DeleteLabel)
+					m.Post("/initialize", bindIgnErr(auth.InitializeLabelsForm{}), org.InitializeLabels)
 				})
 
 				m.Route("/delete", "GET,POST", org.SettingsDelete)
@@ -634,12 +666,13 @@ func RegisterRoutes(m *macaron.Macaron) {
 				m.Get("", repo.Webhooks)
 				m.Post("/delete", repo.DeleteWebhook)
 				m.Get("/:type/new", repo.WebhooksNew)
-				m.Post("/gitea/new", bindIgnErr(auth.NewWebhookForm{}), repo.WebHooksNewPost)
+				m.Post("/gitea/new", bindIgnErr(auth.NewWebhookForm{}), repo.GiteaHooksNewPost)
 				m.Post("/gogs/new", bindIgnErr(auth.NewGogshookForm{}), repo.GogsHooksNewPost)
 				m.Post("/slack/new", bindIgnErr(auth.NewSlackHookForm{}), repo.SlackHooksNewPost)
 				m.Post("/discord/new", bindIgnErr(auth.NewDiscordHookForm{}), repo.DiscordHooksNewPost)
 				m.Post("/dingtalk/new", bindIgnErr(auth.NewDingtalkHookForm{}), repo.DingtalkHooksNewPost)
 				m.Post("/telegram/new", bindIgnErr(auth.NewTelegramHookForm{}), repo.TelegramHooksNewPost)
+				m.Post("/matrix/new", bindIgnErr(auth.NewMatrixHookForm{}), repo.MatrixHooksNewPost)
 				m.Post("/msteams/new", bindIgnErr(auth.NewMSTeamsHookForm{}), repo.MSTeamsHooksNewPost)
 				m.Post("/feishu/new", bindIgnErr(auth.NewFeishuHookForm{}), repo.FeishuHooksNewPost)
 				m.Get("/:id", repo.WebHooksEdit)
@@ -650,6 +683,7 @@ func RegisterRoutes(m *macaron.Macaron) {
 				m.Post("/discord/:id", bindIgnErr(auth.NewDiscordHookForm{}), repo.DiscordHooksEditPost)
 				m.Post("/dingtalk/:id", bindIgnErr(auth.NewDingtalkHookForm{}), repo.DingtalkHooksEditPost)
 				m.Post("/telegram/:id", bindIgnErr(auth.NewTelegramHookForm{}), repo.TelegramHooksEditPost)
+				m.Post("/matrix/:id", bindIgnErr(auth.NewMatrixHookForm{}), repo.MatrixHooksEditPost)
 				m.Post("/msteams/:id", bindIgnErr(auth.NewMSTeamsHookForm{}), repo.MSTeamsHooksEditPost)
 				m.Post("/feishu/:id", bindIgnErr(auth.NewFeishuHookForm{}), repo.FeishuHooksEditPost)
 
@@ -688,6 +722,17 @@ func RegisterRoutes(m *macaron.Macaron) {
 
 	m.Post("/:username/:reponame/action/:action", reqSignIn, context.RepoAssignment(), context.UnitTypes(), repo.Action)
 
+	// Grouping for those endpoints not requiring authentication
+	m.Group("/:username/:reponame", func() {
+		m.Group("/milestone", func() {
+			m.Get("/:id", repo.MilestoneIssuesAndPulls)
+		}, reqRepoIssuesOrPullsReader, context.RepoRef())
+		m.Combo("/compare/*", repo.MustBeNotEmpty, reqRepoCodeReader, repo.SetEditorconfigIfExists).
+			Get(ignSignIn, repo.SetDiffViewStyle, repo.CompareDiff).
+			Post(reqSignIn, context.RepoMustNotBeArchived(), reqRepoPullsReader, repo.MustAllowPulls, bindIgnErr(auth.CreateIssueForm{}), repo.CompareAndPullRequestPost)
+	}, context.RepoAssignment(), context.UnitTypes())
+
+	// Grouping for those endpoints that do require authentication
 	m.Group("/:username/:reponame", func() {
 		m.Group("/issues", func() {
 			m.Combo("/new").Get(context.RepoRef(), repo.NewIssue).
@@ -720,8 +765,11 @@ func RegisterRoutes(m *macaron.Macaron) {
 
 			m.Post("/labels", reqRepoIssuesOrPullsWriter, repo.UpdateIssueLabel)
 			m.Post("/milestone", reqRepoIssuesOrPullsWriter, repo.UpdateIssueMilestone)
+			m.Post("/projects", reqRepoIssuesOrPullsWriter, repo.UpdateIssueProject)
 			m.Post("/assignee", reqRepoIssuesOrPullsWriter, repo.UpdateIssueAssignee)
+			m.Post("/request_review", reqRepoIssuesOrPullsReader, repo.UpdatePullReviewRequest)
 			m.Post("/status", reqRepoIssuesOrPullsWriter, repo.UpdateIssueStatus)
+			m.Post("/resolve_conversation", reqRepoIssuesOrPullsReader, repo.UpdateResolveConversation)
 		}, context.RepoMustNotBeArchived())
 		m.Group("/comments/:id", func() {
 			m.Post("", repo.UpdateCommentContent)
@@ -740,15 +788,9 @@ func RegisterRoutes(m *macaron.Macaron) {
 				Post(bindIgnErr(auth.CreateMilestoneForm{}), repo.NewMilestonePost)
 			m.Get("/:id/edit", repo.EditMilestone)
 			m.Post("/:id/edit", bindIgnErr(auth.CreateMilestoneForm{}), repo.EditMilestonePost)
-			m.Post("/:id/:action", repo.ChangeMilestonStatus)
+			m.Post("/:id/:action", repo.ChangeMilestoneStatus)
 			m.Post("/delete", repo.DeleteMilestone)
 		}, context.RepoMustNotBeArchived(), reqRepoIssuesOrPullsWriter, context.RepoRef())
-		m.Group("/milestone", func() {
-			m.Get("/:id", repo.MilestoneIssuesAndPulls)
-		}, reqRepoIssuesOrPullsReader, context.RepoRef())
-		m.Combo("/compare/*", repo.MustBeNotEmpty, reqRepoCodeReader, repo.SetEditorconfigIfExists).
-			Get(repo.SetDiffViewStyle, repo.CompareDiff).
-			Post(context.RepoMustNotBeArchived(), reqRepoPullsReader, repo.MustAllowPulls, bindIgnErr(auth.CreateIssueForm{}), repo.CompareAndPullRequestPost)
 		m.Group("/pull", func() {
 			m.Post("/:index/target_branch", repo.UpdatePullRequestTarget)
 		}, context.RepoMustNotBeArchived())
@@ -787,7 +829,9 @@ func RegisterRoutes(m *macaron.Macaron) {
 	// Releases
 	m.Group("/:username/:reponame", func() {
 		m.Group("/releases", func() {
-			m.Get("/", repo.MustBeNotEmpty, repo.Releases)
+			m.Get("/", repo.Releases)
+			m.Get("/tag/:tag", repo.SingleRelease)
+			m.Get("/latest", repo.LatestRelease)
 		}, repo.MustBeNotEmpty, context.RepoRef())
 		m.Group("/releases", func() {
 			m.Get("/new", repo.NewRelease)
@@ -825,10 +869,36 @@ func RegisterRoutes(m *macaron.Macaron) {
 			m.Get("/milestones", reqRepoIssuesOrPullsReader, repo.Milestones)
 		}, context.RepoRef())
 
+		m.Group("/projects", func() {
+			m.Get("", repo.Projects)
+			m.Get("/:id", repo.ViewProject)
+			m.Group("", func() {
+				m.Get("/new", repo.NewProject)
+				m.Post("/new", bindIgnErr(auth.CreateProjectForm{}), repo.NewProjectPost)
+				m.Group("/:id", func() {
+					m.Post("", bindIgnErr(auth.EditProjectBoardTitleForm{}), repo.AddBoardToProjectPost)
+					m.Post("/delete", repo.DeleteProject)
+
+					m.Get("/edit", repo.EditProject)
+					m.Post("/edit", bindIgnErr(auth.CreateProjectForm{}), repo.EditProjectPost)
+					m.Post("/^:action(open|close)$", repo.ChangeProjectStatus)
+
+					m.Group("/:boardID", func() {
+						m.Put("", bindIgnErr(auth.EditProjectBoardTitleForm{}), repo.EditProjectBoardTitle)
+						m.Delete("", repo.DeleteProjectBoard)
+
+						m.Post("/:index", repo.MoveIssueAcrossBoards)
+					})
+				})
+			}, reqRepoProjectsWriter, context.RepoMustNotBeArchived())
+		}, reqRepoProjectsReader, repo.MustEnableProjects)
+
 		m.Group("/wiki", func() {
 			m.Get("/?:page", repo.Wiki)
 			m.Get("/_pages", repo.WikiPages)
 			m.Get("/:page/_revision", repo.WikiRevision)
+			m.Get("/commit/:sha([a-f0-9]{7,40})$", repo.SetEditorconfigIfExists, repo.SetDiffViewStyle, repo.Diff)
+			m.Get("/commit/:sha([a-f0-9]{7,40})\\.:ext(patch|diff)", repo.RawDiff)
 
 			m.Group("", func() {
 				m.Combo("/_new").Get(repo.NewWiki).
@@ -837,7 +907,9 @@ func RegisterRoutes(m *macaron.Macaron) {
 					Post(bindIgnErr(auth.NewWikiForm{}), repo.EditWikiPost)
 				m.Post("/:page/delete", repo.DeleteWikiPagePost)
 			}, context.RepoMustNotBeArchived(), reqSignIn, reqRepoWikiWriter)
-		}, repo.MustEnableWiki, context.RepoRef())
+		}, repo.MustEnableWiki, context.RepoRef(), func(ctx *context.Context) {
+			ctx.Data["PageIsWiki"] = true
+		})
 
 		m.Group("/wiki", func() {
 			m.Get("/raw/*", repo.WikiRaw)
@@ -869,7 +941,7 @@ func RegisterRoutes(m *macaron.Macaron) {
 			m.Get(".diff", repo.DownloadPullDiff)
 			m.Get(".patch", repo.DownloadPullPatch)
 			m.Get("/commits", context.RepoRef(), repo.ViewPullCommits)
-			m.Post("/merge", context.RepoMustNotBeArchived(), reqRepoPullsWriter, bindIgnErr(auth.MergePullRequestForm{}), repo.MergePullRequest)
+			m.Post("/merge", context.RepoMustNotBeArchived(), bindIgnErr(auth.MergePullRequestForm{}), repo.MergePullRequest)
 			m.Post("/update", repo.UpdatePullRequest)
 			m.Post("/cleanup", context.RepoMustNotBeArchived(), context.RepoRef(), repo.CleanUpPullRequest)
 			m.Group("/files", func() {
@@ -1014,10 +1086,6 @@ func RegisterRoutes(m *macaron.Macaron) {
 	// Progressive Web App
 	m.Get("/manifest.json", templates.JSONRenderer(), func(ctx *context.Context) {
 		ctx.HTML(200, "pwa/manifest_json")
-	})
-
-	m.Get("/serviceworker.js", templates.JSRenderer(), func(ctx *context.Context) {
-		ctx.HTML(200, "pwa/serviceworker_js")
 	})
 
 	// prometheus metrics endpoint

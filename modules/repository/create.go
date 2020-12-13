@@ -6,13 +6,13 @@ package repository
 
 import (
 	"fmt"
-	"os"
 	"strings"
 
 	"code.gitea.io/gitea/models"
 	"code.gitea.io/gitea/modules/git"
 	"code.gitea.io/gitea/modules/log"
 	"code.gitea.io/gitea/modules/setting"
+	"code.gitea.io/gitea/modules/util"
 )
 
 // CreateRepository creates a repository for the user/organization.
@@ -47,8 +47,8 @@ func CreateRepository(doer, u *models.User, opts models.CreateRepoOptions) (_ *m
 		// No need for init mirror.
 		if !opts.IsMirror {
 			repoPath := models.RepoPath(u.Name, repo.Name)
-			if err = initRepository(ctx, repoPath, u, repo, opts); err != nil {
-				if err2 := os.RemoveAll(repoPath); err2 != nil {
+			if err = initRepository(ctx, repoPath, doer, repo, opts); err != nil {
+				if err2 := util.RemoveAll(repoPath); err2 != nil {
 					log.Error("initRepository: %v", err)
 					return fmt.Errorf(
 						"delete repo directory %s/%s failed(2): %v", u.Name, repo.Name, err2)
@@ -58,7 +58,7 @@ func CreateRepository(doer, u *models.User, opts models.CreateRepoOptions) (_ *m
 
 			// Initialize Issue Labels if selected
 			if len(opts.IssueLabels) > 0 {
-				if err = models.InitializeLabels(ctx, repo.ID, opts.IssueLabels); err != nil {
+				if err = models.InitializeLabels(ctx, repo.ID, opts.IssueLabels, false); err != nil {
 					return fmt.Errorf("InitializeLabels: %v", err)
 				}
 			}

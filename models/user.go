@@ -29,6 +29,7 @@ import (
 	"code.gitea.io/gitea/modules/generate"
 	"code.gitea.io/gitea/modules/git"
 	"code.gitea.io/gitea/modules/log"
+	"code.gitea.io/gitea/modules/public"
 	"code.gitea.io/gitea/modules/setting"
 	"code.gitea.io/gitea/modules/structs"
 	api "code.gitea.io/gitea/modules/structs"
@@ -163,8 +164,9 @@ type User struct {
 	RepoAdminChangeTeamAccess bool                `xorm:"NOT NULL DEFAULT false"`
 
 	// Preferences
-	DiffViewStyle string `xorm:"NOT NULL DEFAULT ''"`
-	Theme         string `xorm:"NOT NULL DEFAULT ''"`
+	DiffViewStyle       string `xorm:"NOT NULL DEFAULT ''"`
+	Theme               string `xorm:"NOT NULL DEFAULT ''"`
+	KeepActivityPrivate bool   `xorm:"NOT NULL DEFAULT false"`
 }
 
 // SearchOrganizationsOptions options to filter organizations
@@ -279,6 +281,7 @@ func (u *User) MaxCreationLimit() int {
 }
 
 // CanCreateRepo returns if user login can create a repository
+// NOTE: functions calling this assume a failure due to repository count limit; if new checks are added, those functions should be revised
 func (u *User) CanCreateRepo() bool {
 	if u.IsAdmin {
 		return true
@@ -579,7 +582,7 @@ func (u *User) UploadAvatar(data []byte) error {
 func (u *User) DeleteAvatar() error {
 	log.Trace("DeleteAvatar[%d]: %s", u.ID, u.CustomAvatarPath())
 	if len(u.Avatar) > 0 {
-		if err := os.Remove(u.CustomAvatarPath()); err != nil {
+		if err := util.Remove(u.CustomAvatarPath()); err != nil {
 			return fmt.Errorf("Failed to remove %s: %v", u.CustomAvatarPath(), err)
 		}
 	}
@@ -607,12 +610,12 @@ func (u *User) IsUserOrgOwner(orgID int64) bool {
 	return isOwner
 }
 
-// IsUserPartOfOrg returns true if user with userID is part of the u organisation.
-func (u *User) IsUserPartOfOrg(userID int64) bool {
-	return u.isUserPartOfOrg(x, userID)
+// HasMemberWithUserID returns true if user with userID is part of the u organisation.
+func (u *User) HasMemberWithUserID(userID int64) bool {
+	return u.hasMemberWithUserID(x, userID)
 }
 
-func (u *User) isUserPartOfOrg(e Engine, userID int64) bool {
+func (u *User) hasMemberWithUserID(e Engine, userID int64) bool {
 	isMember, err := isOrganizationMember(e, u.ID, userID)
 	if err != nil {
 		log.Error("IsOrganizationMember: %v", err)
@@ -644,7 +647,7 @@ func (u *User) GetOrganizationCount() (int64, error) {
 
 // GetRepositories returns repositories that user owns, including private repositories.
 func (u *User) GetRepositories(listOpts ListOptions) (err error) {
-	u.Repos, err = GetUserRepositories(&SearchRepoOptions{Actor: u, Private: true, ListOptions: listOpts})
+	u.Repos, _, err = GetUserRepositories(&SearchRepoOptions{Actor: u, Private: true, ListOptions: listOpts})
 	return err
 }
 
@@ -711,18 +714,52 @@ func (u *User) GetOwnedOrganizations() (err error) {
 
 // GetOrganizations returns paginated organizations that user belongs to.
 func (u *User) GetOrganizations(opts *SearchOrganizationsOptions) error {
-	ous, err := GetOrgUsersByUserID(u.ID, opts)
+	sess := x.NewSession()
+	defer sess.Close()
+
+	schema, err := x.TableInfo(new(User))
 	if err != nil {
 		return err
 	}
-
-	u.Orgs = make([]*User, len(ous))
-	for i, ou := range ous {
-		u.Orgs[i], err = GetUserByID(ou.OrgID)
-		if err != nil {
-			return err
-		}
+	groupByCols := &strings.Builder{}
+	for _, col := range schema.Columns() {
+		fmt.Fprintf(groupByCols, "`%s`.%s,", schema.Name, col.Name)
 	}
+	groupByStr := groupByCols.String()
+	groupByStr = groupByStr[0 : len(groupByStr)-1]
+
+	sess.Select("`user`.*, count(repo_id) as org_count").
+		Table("user").
+		Join("INNER", "org_user", "`org_user`.org_id=`user`.id").
+		Join("LEFT", builder.
+			Select("id as repo_id, owner_id as repo_owner_id").
+			From("repository").
+			Where(accessibleRepositoryCondition(u)), "`repository`.repo_owner_id = `org_user`.org_id").
+		And("`org_user`.uid=?", u.ID).
+		GroupBy(groupByStr)
+	if opts.PageSize != 0 {
+		sess = opts.setSessionPagination(sess)
+	}
+	type OrgCount struct {
+		User     `xorm:"extends"`
+		OrgCount int
+	}
+	orgCounts := make([]*OrgCount, 0, 10)
+
+	if err := sess.
+		Asc("`user`.name").
+		Find(&orgCounts); err != nil {
+		return err
+	}
+
+	orgs := make([]*User, len(orgCounts))
+	for i, orgCount := range orgCounts {
+		orgCount.User.NumRepos = orgCount.OrgCount
+		orgs[i] = &orgCount.User
+	}
+
+	u.Orgs = orgs
+
 	return nil
 }
 
@@ -739,9 +776,11 @@ func (u *User) DisplayName() string {
 // GetDisplayName returns full name if it's not empty and DEFAULT_SHOW_FULL_NAME is set,
 // returns username otherwise.
 func (u *User) GetDisplayName() string {
-	trimmed := strings.TrimSpace(u.FullName)
-	if len(trimmed) > 0 && setting.UI.DefaultShowFullName {
-		return trimmed
+	if setting.UI.DefaultShowFullName {
+		trimmed := strings.TrimSpace(u.FullName)
+		if len(trimmed) > 0 {
+			return trimmed
+		}
 	}
 	return u.Name
 }
@@ -841,24 +880,25 @@ func (u *User) IsGhost() bool {
 }
 
 var (
-	reservedUsernames = []string{
-		"attachments",
+	reservedUsernames = append([]string{
+		".",
+		"..",
+		".well-known",
 		"admin",
 		"api",
 		"assets",
+		"attachments",
 		"avatars",
 		"commits",
-		"css",
 		"debug",
 		"error",
 		"explore",
 		"ghost",
 		"help",
-		"img",
 		"install",
 		"issues",
-		"js",
 		"less",
+		"login",
 		"manifest.json",
 		"metrics",
 		"milestones",
@@ -869,17 +909,13 @@ var (
 		"pulls",
 		"raw",
 		"repo",
+		"robots.txt",
+		"search",
 		"stars",
 		"template",
 		"user",
-		"vendor",
-		"login",
-		"robots.txt",
-		".",
-		"..",
-		".well-known",
-		"search",
-	}
+	}, public.KnownPublicEntries...)
+
 	reservedUserPatterns = []string{"*.keys", "*.gpg"}
 )
 
@@ -1246,14 +1282,14 @@ func deleteUser(e *xorm.Session, u *User) error {
 	//	so just keep error logs of those operations.
 	path := UserPath(u.Name)
 
-	if err := os.RemoveAll(path); err != nil {
+	if err := util.RemoveAll(path); err != nil {
 		return fmt.Errorf("Failed to RemoveAll %s: %v", path, err)
 	}
 
 	if len(u.Avatar) > 0 {
 		avatarPath := u.CustomAvatarPath()
 		if com.IsExist(avatarPath) {
-			if err := os.Remove(avatarPath); err != nil {
+			if err := util.Remove(avatarPath); err != nil {
 				return fmt.Errorf("Failed to remove %s: %v", avatarPath, err)
 			}
 		}
@@ -1283,16 +1319,30 @@ func DeleteUser(u *User) (err error) {
 	return sess.Commit()
 }
 
-// DeleteInactivateUsers deletes all inactivate users and email addresses.
-func DeleteInactivateUsers() (err error) {
+// DeleteInactiveUsers deletes all inactive users and email addresses.
+func DeleteInactiveUsers(ctx context.Context, olderThan time.Duration) (err error) {
 	users := make([]*User, 0, 10)
-	if err = x.
-		Where("is_active = ?", false).
-		Find(&users); err != nil {
-		return fmt.Errorf("get all inactive users: %v", err)
+	if olderThan > 0 {
+		if err = x.
+			Where("is_active = ? and created_unix < ?", false, time.Now().Add(-olderThan).Unix()).
+			Find(&users); err != nil {
+			return fmt.Errorf("get all inactive users: %v", err)
+		}
+	} else {
+		if err = x.
+			Where("is_active = ?", false).
+			Find(&users); err != nil {
+			return fmt.Errorf("get all inactive users: %v", err)
+		}
+
 	}
 	// FIXME: should only update authorized_keys file once after all deletions.
 	for _, u := range users {
+		select {
+		case <-ctx.Done():
+			return ErrCancelledf("Before delete inactive user %s", u.Name)
+		default:
+		}
 		if err = DeleteUser(u); err != nil {
 			// Ignore users that were set inactive by admin.
 			if IsErrUserOwnRepos(err) || IsErrUserHasOrgs(err) {
@@ -1311,21 +1361,6 @@ func DeleteInactivateUsers() (err error) {
 // UserPath returns the path absolute path of user repositories.
 func UserPath(userName string) string {
 	return filepath.Join(setting.RepoRootPath, strings.ToLower(userName))
-}
-
-// GetUserByKeyID get user information by user's public key id
-func GetUserByKeyID(keyID int64) (*User, error) {
-	var user User
-	has, err := x.Join("INNER", "public_key", "`public_key`.owner_id = `user`.id").
-		Where("`public_key`.id=?", keyID).
-		Get(&user)
-	if err != nil {
-		return nil, err
-	}
-	if !has {
-		return nil, ErrUserNotExist{0, "", keyID}
-	}
-	return &user, nil
 }
 
 func getUserByID(e Engine, id int64) (*User, error) {
@@ -1409,7 +1444,7 @@ func GetUserNamesByIDs(ids []int64) ([]string, error) {
 }
 
 // GetUsersByIDs returns all resolved users from a list of Ids.
-func GetUsersByIDs(ids []int64) ([]*User, error) {
+func GetUsersByIDs(ids []int64) (UserList, error) {
 	ous := make([]*User, 0, len(ids))
 	if len(ids) == 0 {
 		return ous, nil
@@ -1521,8 +1556,8 @@ func GetUserByEmailContext(ctx DBContext, email string) (*User, error) {
 	// Finally, if email address is the protected email address:
 	if strings.HasSuffix(email, fmt.Sprintf("@%s", setting.Service.NoReplyAddress)) {
 		username := strings.TrimSuffix(email, fmt.Sprintf("@%s", setting.Service.NoReplyAddress))
-		user := &User{LowerName: username}
-		has, err := ctx.e.Get(user)
+		user := &User{}
+		has, err := ctx.e.Where("lower_name=?", username).Get(user)
 		if err != nil {
 			return nil, err
 		}
@@ -1791,16 +1826,14 @@ func synchronizeLdapSSHPublicKeys(usr *User, s *LoginSource, sshPublicKeys []str
 }
 
 // SyncExternalUsers is used to synchronize users with external authorization source
-func SyncExternalUsers(ctx context.Context) {
+func SyncExternalUsers(ctx context.Context, updateExisting bool) error {
 	log.Trace("Doing: SyncExternalUsers")
 
 	ls, err := LoginSources()
 	if err != nil {
 		log.Error("SyncExternalUsers: %v", err)
-		return
+		return err
 	}
-
-	updateExisting := setting.Cron.SyncExternalUsers.UpdateExisting
 
 	for _, s := range ls {
 		if !s.IsActived || !s.IsSyncEnabled {
@@ -1808,8 +1841,8 @@ func SyncExternalUsers(ctx context.Context) {
 		}
 		select {
 		case <-ctx.Done():
-			log.Warn("SyncExternalUsers: Aborted due to shutdown before update of %s", s.Name)
-			return
+			log.Warn("SyncExternalUsers: Cancelled before update of %s", s.Name)
+			return ErrCancelledf("Before update of %s", s.Name)
 		default:
 		}
 
@@ -1827,12 +1860,12 @@ func SyncExternalUsers(ctx context.Context) {
 				Find(&users)
 			if err != nil {
 				log.Error("SyncExternalUsers: %v", err)
-				return
+				return err
 			}
 			select {
 			case <-ctx.Done():
-				log.Warn("SyncExternalUsers: Aborted due to shutdown before update of %s", s.Name)
-				return
+				log.Warn("SyncExternalUsers: Cancelled before update of %s", s.Name)
+				return ErrCancelledf("Before update of %s", s.Name)
 			default:
 			}
 
@@ -1854,7 +1887,7 @@ func SyncExternalUsers(ctx context.Context) {
 			for _, su := range sr {
 				select {
 				case <-ctx.Done():
-					log.Warn("SyncExternalUsers: Aborted due to shutdown at update of %s before completed update of users", s.Name)
+					log.Warn("SyncExternalUsers: Cancelled at update of %s before completed update of users", s.Name)
 					// Rewrite authorized_keys file if LDAP Public SSH Key attribute is set and any key was added or removed
 					if sshKeysNeedUpdate {
 						err = RewriteAllPublicKeys()
@@ -1862,7 +1895,7 @@ func SyncExternalUsers(ctx context.Context) {
 							log.Error("RewriteAllPublicKeys: %v", err)
 						}
 					}
-					return
+					return ErrCancelledf("During update of %s before completed update of users", s.Name)
 				default:
 				}
 				if len(su.Username) == 0 {
@@ -1888,15 +1921,16 @@ func SyncExternalUsers(ctx context.Context) {
 					log.Trace("SyncExternalUsers[%s]: Creating user %s", s.Name, su.Username)
 
 					usr = &User{
-						LowerName:   strings.ToLower(su.Username),
-						Name:        su.Username,
-						FullName:    fullName,
-						LoginType:   s.Type,
-						LoginSource: s.ID,
-						LoginName:   su.Username,
-						Email:       su.Mail,
-						IsAdmin:     su.IsAdmin,
-						IsActive:    true,
+						LowerName:    strings.ToLower(su.Username),
+						Name:         su.Username,
+						FullName:     fullName,
+						LoginType:    s.Type,
+						LoginSource:  s.ID,
+						LoginName:    su.Username,
+						Email:        su.Mail,
+						IsAdmin:      su.IsAdmin,
+						IsRestricted: su.IsRestricted,
+						IsActive:     true,
 					}
 
 					err = CreateUser(usr)
@@ -1919,6 +1953,7 @@ func SyncExternalUsers(ctx context.Context) {
 
 					// Check if user data has changed
 					if (len(s.LDAP().AdminFilter) > 0 && usr.IsAdmin != su.IsAdmin) ||
+						(len(s.LDAP().RestrictedFilter) > 0 && usr.IsRestricted != su.IsRestricted) ||
 						!strings.EqualFold(usr.Email, su.Mail) ||
 						usr.FullName != fullName ||
 						!usr.IsActive {
@@ -1931,9 +1966,13 @@ func SyncExternalUsers(ctx context.Context) {
 						if len(s.LDAP().AdminFilter) > 0 {
 							usr.IsAdmin = su.IsAdmin
 						}
+						// Change existing restricted flag only if RestrictedFilter option is set
+						if !usr.IsAdmin && len(s.LDAP().RestrictedFilter) > 0 {
+							usr.IsRestricted = su.IsRestricted
+						}
 						usr.IsActive = true
 
-						err = UpdateUserCols(usr, "full_name", "email", "is_admin", "is_active")
+						err = UpdateUserCols(usr, "full_name", "email", "is_admin", "is_restricted", "is_active")
 						if err != nil {
 							log.Error("SyncExternalUsers[%s]: Error updating user %s: %v", s.Name, usr.Name, err)
 						}
@@ -1951,8 +1990,8 @@ func SyncExternalUsers(ctx context.Context) {
 
 			select {
 			case <-ctx.Done():
-				log.Warn("SyncExternalUsers: Aborted due to shutdown at update of %s before delete users", s.Name)
-				return
+				log.Warn("SyncExternalUsers: Cancelled during update of %s before delete users", s.Name)
+				return ErrCancelledf("During update of %s before delete users", s.Name)
 			default:
 			}
 
@@ -1979,4 +2018,5 @@ func SyncExternalUsers(ctx context.Context) {
 			}
 		}
 	}
+	return nil
 }

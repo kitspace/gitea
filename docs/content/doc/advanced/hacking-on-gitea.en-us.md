@@ -25,7 +25,7 @@ environment variable and to add the go bin directory or directories
 
 Next, [install Node.js with npm](https://nodejs.org/en/download/) which is
 required to build the JavaScript and CSS files. The minimum supported Node.js
-version is 10 and the latest LTS version is recommended.
+version is {{< min-node-version >}} and the latest LTS version is recommended.
 
 You will also need make.
 <a href='{{< relref "doc/advanced/make.en-us.md" >}}'>(See here how to get Make)</a>
@@ -36,17 +36,12 @@ necessary. To be able to use these you must have the `"$GOPATH"/bin` directory
 on the executable path. If you don't add the go bin directory to the
 executable path you will have to manage this yourself.
 
-**Note 2**: Go version 1.11 or higher is required; however, it is important
+**Note 2**: Go version {{< min-go-version >}} or higher is required; however, it is important
 to note that our continuous integration will check that the formatting of the
 source code is not changed by `gofmt` using `make fmt-check`. Unfortunately,
 the results of `gofmt` can differ by the version of `go`. It is therefore
-recommended to install the version of go that our continuous integration is
-running. At the time of writing this is Go version 1.12; however, this can be
-checked by looking at the
-[master `.drone.yml`](https://github.com/go-gitea/gitea/blob/master/.drone.yml)
-(At the time of writing
-[line 67](https://github.com/go-gitea/gitea/blob/8917d66571a95f3da232a0c27bc1300210d10fde/.drone.yml#L67)
-is the relevant line - but this may change.)
+recommended to install the version of Go that our continuous integration is
+running. As of last update, it should be Go version {{< go-version >}}.
 
 ## Downloading and cloning the Gitea source code
 
@@ -96,12 +91,23 @@ The simplest recommended way to build from source is:
 TAGS="bindata sqlite sqlite_unlock_notify" make build
 ```
 
-However, there are a number of additional make tasks you should be aware of.
-These are documented below but you can look at our
-[`Makefile`](https://github.com/go-gitea/gitea/blob/master/Makefile) for more,
-and look at our
-[`.drone.yml`](https://github.com/go-gitea/gitea/blob/master/.drone.yml) to see
-how our continuous integration works.
+The `build` target will execute both `frontend` and `backend` sub-targets. If the `bindata` tag is present, the frontend files will be compiled into the binary. It is recommended to leave out the tag when doing frontend development so that changes will be reflected.
+
+See `make help` for all available `make` targets. Also see [`.drone.yml`](https://github.com/go-gitea/gitea/blob/master/.drone.yml) to see how our continuous integration works.
+
+## Building continuously
+
+Both the `frontend` and `backend` targets can be ran continuously when source files change:
+
+````bash
+# in your first terminal
+make watch-backend
+
+# in your second terminal
+make watch-frontend
+````
+
+On macOS, watching all backend source files may hit the default open files limit which can be increased via `ulimit -n 12288` for the current shell or in your shell startup file for all future shells.
 
 ### Formatting, code analysis and spell check
 
@@ -133,18 +139,27 @@ make revive vet misspell-check
 
 ### Working on JS and CSS
 
-Edit files in `web_src` and run the linter and build the files in `public`:
+Either use the `watch-frontend` target mentioned above or just build once:
 
 ```bash
-make webpack
+make build && ./gitea
 ```
 
-Note: When working on frontend code, it is advisable to set `USE_SERVICE_WORKER` to `false` in `app.ini` which will prevent undesirable caching of frontend assets.
+Before committing, make sure the linters pass:
 
-### Building Images
+```bash
+make lint-frontend
+```
 
-To build the images, ImageMagick, `inkscape` and `zopflipng` binaries must be available in
-your `PATH` to run `make generate-images`.
+Note: When working on frontend code, set `USE_SERVICE_WORKER` to `false` in `app.ini` to prevent undesirable caching of frontend assets.
+
+### Building and adding SVGs
+
+SVG icons are built using the `make svg` target which compiles the icon sources defined in `build/generate-svg.js` into the output directory `public/img/svg`. Custom icons can be added in the `web_src/svg` directory.
+
+### Building the Logo
+
+The PNG versions of the logo are built from a single SVG source file `assets/logo.svg` using the `make generate-images` target. To run it, Node.js and npm must be available. The same process can also be used to generate a custom logo PNGs from a SVG source file. It's possible to remove parts of the SVG logo for the favicon build by adding a `detail-remove` class to the SVG nodes to be removed.
 
 ### Updating the API
 
