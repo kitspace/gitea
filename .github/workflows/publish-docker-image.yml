@@ -15,5 +15,5 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
           registry: docker.pkg.github.com
-          repository: Kitspace/gitea/gitea-image
+          repository: kitspace/gitea/gitea-image
           tag_with_ref: true
