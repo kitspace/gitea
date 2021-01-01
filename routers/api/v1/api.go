@@ -851,7 +851,6 @@ func RegisterRoutes(m *macaron.Macaron) {
 					m.Get("/*", repo.GetContents)
 					m.Group("/*", func() {
 						m.Post("", bind(api.CreateFileOptions{}), repo.CreateFile)
-						m.Post("", bind(api.CreateFilesOptions{}, repo.CreateFiles))
 						m.Put("", bind(api.UpdateFileOptions{}), repo.UpdateFile)
 						m.Delete("", bind(api.DeleteFileOptions{}), repo.DeleteFile)
 					}, reqRepoWriter(models.UnitTypeCode), reqToken())

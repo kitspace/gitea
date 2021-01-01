@@ -252,65 +252,6 @@ func CreateFile(ctx *context.APIContext, apiOpts api.CreateFileOptions) {
 	}
 }
 
-func CreateFiles(ctx *context.APIContext, apiOpts api.CreateFilesOptions) {
-	// swagger:operation POST /repos/{owner}/{repo}/contents/{filepath} repository repoCreateFiles
-	// ---
-	// summary: Create multiple files in a repository
-	// consumes:
-	// - application/json
-	// produces:
-	// - application/json
-	// parameters:
-	// - name: files
-	//   in: path
-	//   description: array of files to create
-	//   type: [] FileOptions
-	//   required: true
-	// responses:
-	//   "201":
-	//     "$ref": "#/responses/FileResponse"
-	for _, file := range apiOpts.Files {
-		opts := &repofiles.UpdateRepoFileOptions{
-			Content:   file.Content,
-			IsNewFile: true,
-			Message:   file.Message,
-			TreePath:  ctx.Params("*"),
-			OldBranch: file.BranchName,
-			NewBranch: file.NewBranchName,
-			Committer: &repofiles.IdentityOptions{
-				Name:  file.Committer.Name,
-				Email: file.Committer.Email,
-			},
-			Author: &repofiles.IdentityOptions{
-				Name:  file.Author.Name,
-				Email: file.Author.Email,
-			},
-			Dates: &repofiles.CommitDateOptions{
-				Author:    file.Dates.Author,
-				Committer: file.Dates.Committer,
-			},
-		}
-		if opts.Dates.Author.IsZero() {
-			opts.Dates.Author = time.Now()
-		}
-		if opts.Dates.Committer.IsZero() {
-			opts.Dates.Committer = time.Now()
-		}
-
-		if opts.Message == "" {
-			opts.Message = ctx.Tr("repo.editor.add", opts.TreePath)
-		}
-
-		if fileResponse, err := createOrUpdateFile(ctx, opts); err != nil {
-			ctx.Error(http.StatusInternalServerError, "CreateFile", err)
-			// if one file fails return the error message and don't proceed with the upload process
-			return
-		} else {
-			ctx.JSON(http.StatusCreated, fileResponse)
-		}
-	}
-}
-
 // UpdateFile handles API call for updating a file
 func UpdateFile(ctx *context.APIContext, apiOpts api.UpdateFileOptions) {
 	// swagger:operation PUT /repos/{owner}/{repo}/contents/{filepath} repository repoUpdateFile
