@@ -13,13 +13,13 @@ import (
 var (
 	// CORSConfig defines CORS settings
 	CORSConfig = struct {
-		Enabled             bool
-		Scheme              string
-		AllowDomain         []string
-		AllowSubdomain      bool
-		Methods             []string
-		MaxAge              time.Duration
-		AllowCredentials    bool
+		Enabled          bool
+		Scheme           string
+		AllowDomain      []string
+		AllowSubdomain   bool
+		Methods          []string
+		MaxAge           time.Duration
+		AllowCredentials bool
 	}{
 		Enabled: false,
 		MaxAge:  10 * time.Minute,
