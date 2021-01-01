@@ -92,30 +92,23 @@ func KitspaceSignUp(ctx *context.Context, form auth.RegisterForm) {
 	}
 
 	// Send confirmation email
+	// The mailing service works only in production during development no mails are sent
 	if setting.Service.RegisterEmailConfirm && u.ID > 1 {
 		mailer.SendActivateAccountMail(ctx.Locale, u)
-
-		response := make(map[string]string)
-		response["email"] = u.Email
-		response["ActiveCodeLives"] = timeutil.MinutesToFriendly(
-			setting.Service.ActiveCodeLives,
-			ctx.Locale.Language(),
-		)
 
 		if err := ctx.Cache.Put("MailResendLimit_"+u.LowerName, u.LowerName, 180); err != nil {
 			log.Error("Set cache(MailResendLimit) fail: %v", err)
 		}
-
-		ctx.JSON(http.StatusOK, response)
-	} else {
-		// make the mock response similar to the response when mailing works
-		response := map[string]string{
-			"email":           u.Email,
-			"ActiveCodeLives": timeutil.MinutesToFriendly(setting.Service.ActiveCodeLives, ctx.Locale.Language()),
-		}
-
-		ctx.JSON(http.StatusCreated, response)
 	}
+
+	// Return the success response with user details
+	response["email"] = u.Email
+	response["ActiveCodeLives"] = timeutil.MinutesToFriendly(
+		setting.Service.ActiveCodeLives,
+		ctx.Locale.Language(),
+	)
+
+	ctx.JSON(http.StatusCreated, response)
 	return
 }
 
