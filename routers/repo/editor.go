@@ -679,8 +679,8 @@ func UploadFilePost(ctx *context.Context, form auth.UploadRepoFileForm) {
 
 // UploadFilePostJson JSON response for uploading file
 func UploadFilePostJson(ctx *context.Context, form auth.UploadRepoFileForm) {
-	// `canCommit` is a poorly named; it's not responsible directly for rendering anything,
-	// it returns a boolean with commit rights
+	// `renderCommitRights` is a poorly named; it's not responsible directly for rendering anything,
+	// it returns a boolean
 	canCommit := renderCommitRights(ctx)
 	oldBranchName := ctx.Repo.BranchName
 	branchName := oldBranchName
