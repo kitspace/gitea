@@ -11,16 +11,16 @@ import (
 	"net/http"
 	"strings"
 
+	"code.gitea.io/gitea/modules/task"
+
 	"code.gitea.io/gitea/models"
 	"code.gitea.io/gitea/modules/context"
 	"code.gitea.io/gitea/modules/convert"
 	auth "code.gitea.io/gitea/modules/forms"
-	"code.gitea.io/gitea/modules/graceful"
 	"code.gitea.io/gitea/modules/log"
 	"code.gitea.io/gitea/modules/migrations"
 	"code.gitea.io/gitea/modules/migrations/base"
 	"code.gitea.io/gitea/modules/notification"
-	repo_module "code.gitea.io/gitea/modules/repository"
 	"code.gitea.io/gitea/modules/setting"
 	api "code.gitea.io/gitea/modules/structs"
 	"code.gitea.io/gitea/modules/util"
@@ -165,15 +165,12 @@ func Migrate(ctx *context.APIContext) {
 		opts.Releases = false
 	}
 
-	repo, err := repo_module.CreateRepository(ctx.User, repoOwner, models.CreateRepoOptions{
-		Name:           opts.RepoName,
-		Description:    opts.Description,
-		OriginalURL:    form.CloneAddr,
-		GitServiceType: gitServiceType,
-		IsPrivate:      opts.Private,
-		IsMirror:       opts.Mirror,
-		Status:         models.RepositoryBeingMigrated,
-	})
+	if err = models.CheckCreateRepository(ctx.User, repoOwner, opts.RepoName, false); err != nil {
+		handleMigrateError(ctx, repoOwner, remoteAddr, err)
+		return
+	}
+
+	repo, err := task.MigrateRepository(ctx.User, repoOwner, opts)
 	if err != nil {
 		handleMigrateError(ctx, repoOwner, remoteAddr, err)
 		return
@@ -200,11 +197,6 @@ func Migrate(ctx *context.APIContext) {
 			}
 		}
 	}()
-
-	if _, err = migrations.MigrateRepository(graceful.GetManager().HammerContext(), ctx.User, repoOwner.Name, opts); err != nil {
-		handleMigrateError(ctx, repoOwner, remoteAddr, err)
-		return
-	}
 
 	log.Trace("Repository migrated: %s/%s", repoOwner.Name, form.RepoName)
 	ctx.JSON(http.StatusCreated, convert.ToRepo(repo, models.AccessModeAdmin))
