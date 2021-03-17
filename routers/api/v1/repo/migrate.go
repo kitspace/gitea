@@ -5,7 +5,6 @@
 package repo
 
 import (
-	"encoding/json"
 	"fmt"
 	"net/http"
 	"strings"
@@ -17,16 +16,12 @@ import (
 	"code.gitea.io/gitea/modules/log"
 	"code.gitea.io/gitea/modules/migrations"
 	"code.gitea.io/gitea/modules/migrations/base"
-	migration "code.gitea.io/gitea/modules/migrations/base"
 	"code.gitea.io/gitea/modules/setting"
 	api "code.gitea.io/gitea/modules/structs"
 	"code.gitea.io/gitea/modules/task"
 	"code.gitea.io/gitea/modules/util"
 	"code.gitea.io/gitea/modules/web"
-	"xorm.io/xorm"
 )
-
-var x *xorm.Engine
 
 // Migrate migrate remote git repository to gitea
 func Migrate(ctx *context.APIContext) {
@@ -220,53 +215,33 @@ func handleMigrateError(ctx *context.APIContext, repoOwner *models.User, migrati
 
 // GetMigratingTask returns the migrating task by repo's id
 func GetMigratingTask(ctx *context.APIContext) {
-	tRepo := models.Task{
-		RepoID: ctx.QueryInt64("repo_id"),
-		Type:   api.TaskTypeMigrateRepo,
-	}
-	has, err := x.Get(&tRepo)
-	if err != nil || !has {
-		ctx.JSON(http.StatusInternalServerError, map[string]string{
-			"err": "Internal server error",
-		})
-		return
-	}
+	// swagger:operation GET /repos/migrate/status task
+	// ---
+	// summary: Get the migration status of a repository by its id
+	// produces:
+	// - application/json
+	// parameters:
+	// - name: repo_id
+	//   in: query
+	//   description: repository id
+	//   type: int64
+	// responses:
+	//   "200":
+	//     "$ref": "#/responses/"
+	//   "404":
+	//	   "$ref": "#/response/"
+	t, err := models.GetMigratingTask(ctx.QueryInt64("repo_id"))
 
-	tId, opts, err := getMigratingTaskByID(tRepo.ID, ctx.User.ID)
 	if err != nil {
-		ctx.JSON(http.StatusInternalServerError, map[string]string{
-			"err": "Internal server error",
-		})
+		ctx.JSON(http.StatusNotFound, err)
 		return
 	}
 
 	ctx.JSON(200, map[string]interface{}{
-		"status":    tId.Status,
-		"err":       tId.Errors,
-		"repo-id":   tId.RepoID,
-		"repo-name": opts.RepoName,
-		"start":     tId.StartTime,
-		"end":       tId.EndTime,
+		"status":  t.Status,
+		"err":     t.Errors,
+		"repo-id": t.RepoID,
+		"start":   t.StartTime,
+		"end":     t.EndTime,
 	})
-}
-
-// GetMigratingTaskByID returns the migrating task by repo's id
-func getMigratingTaskByID(id, doerID int64) (*models.Task, *migration.MigrateOptions, error) {
-	var t = models.Task{
-		ID:     id,
-		DoerID: doerID,
-		Type:   api.TaskTypeMigrateRepo,
-	}
-	has, err := x.Get(&t)
-	if err != nil {
-		return nil, nil, err
-	} else if !has {
-		return nil, nil, models.ErrTaskDoesNotExist{ID: id, Type: t.Type}
-	}
-
-	var opts migration.MigrateOptions
-	if err := json.Unmarshal([]byte(t.PayloadContent), &opts); err != nil {
-		return nil, nil, err
-	}
-	return &t, &opts, nil
 }
