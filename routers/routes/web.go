@@ -340,6 +340,8 @@ func RegisterRoutes(m *web.Route) {
 		}
 	}
 
+	m.Get("/__kitspace/?*", routers.Kitspace)
+
 	// FIXME: not all routes need go through same middleware.
 	// Especially some AJAX requests, we can reduce middleware number to improve performance.
 	// Routers.
