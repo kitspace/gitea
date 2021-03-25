@@ -4,17 +4,18 @@ import (
 	"net/http"
 
 	"code.gitea.io/gitea/models"
-	"code.gitea.io/gitea/modules/auth"
 	"code.gitea.io/gitea/modules/context"
+	auth "code.gitea.io/gitea/modules/forms"
 	"code.gitea.io/gitea/modules/log"
 	"code.gitea.io/gitea/modules/password"
 	"code.gitea.io/gitea/modules/setting"
 	"code.gitea.io/gitea/modules/timeutil"
+	"code.gitea.io/gitea/modules/web"
 	"code.gitea.io/gitea/services/mailer"
 )
 
 // KitspaceSignUp custom sign-up compatible with Kitspace architecture
-func KitspaceSignUp(ctx *context.Context, form auth.RegisterForm) {
+func KitspaceSignUp(ctx *context.Context) {
 	// swagger:operation POST /user/kitspace/sign_up
 	// ---
 	// summary: Create a user
@@ -37,6 +38,7 @@ func KitspaceSignUp(ctx *context.Context, form auth.RegisterForm) {
 	//   "422":
 	//     "$ref": "#/responses/validationError"
 	response := make(map[string]string)
+	form := web.GetForm(ctx).(*auth.RegisterForm)
 
 	if len(form.Password) < setting.MinPasswordLength {
 		response["error"] = "UnprocessableEntity"
@@ -113,7 +115,7 @@ func KitspaceSignUp(ctx *context.Context, form auth.RegisterForm) {
 }
 
 // KitspaceSignIn custom sign-in compatible with Kitspace architecture
-func KitspaceSignIn(ctx *context.Context, form auth.SignInForm) {
+func KitspaceSignIn(ctx *context.Context) {
 	// swagger:operation POST /user/kitspace/sign_in
 	// ---
 	// summary: login a user
@@ -138,6 +140,7 @@ func KitspaceSignIn(ctx *context.Context, form auth.SignInForm) {
 	//   "422":
 	//     "$ref": "#/responses/validationError"
 
+	form := web.GetForm(ctx).(*auth.SignInForm)
 	u, err := models.UserSignIn(form.UserName, form.Password)
 
 	response := make(map[string]string)
