@@ -8,9 +8,6 @@ import (
 	"path"
 	"strings"
 
-	"gitea.com/macaron/csrf"
-	"gitea.com/macaron/session"
-
 	"code.gitea.io/gitea/modules/context"
 	"code.gitea.io/gitea/modules/convert"
 	"code.gitea.io/gitea/modules/setting"
@@ -22,7 +19,7 @@ type KitspaceSession struct {
 	Csrf string        `json:"_csrf"`
 }
 
-func Kitspace(ctx *context.Context, sess session.Store, x csrf.CSRF) (int, []byte) {
+func Kitspace(ctx *context.Context) (int, []byte) {
 	url := ctx.Req.URL
 	url.Scheme = "http"
 	url.Host = "frontend:3000"
@@ -33,13 +30,13 @@ func Kitspace(ctx *context.Context, sess session.Store, x csrf.CSRF) (int, []byt
 		1,
 	)
 	var user *structs.User
-	if (ctx.User != nil && ctx.IsSigned) {
+	if ctx.User != nil && ctx.IsSigned {
 		user = convert.ToUser(ctx.User, true, true)
 	}
 
 	m := KitspaceSession{
 		User: user,
-		Csrf: x.GetToken(),
+		Csrf: ctx.Data["CsrfToken"].(string),
 	}
 
 	b, err := json.Marshal(m)
