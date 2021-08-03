@@ -12,7 +12,7 @@ import (
 	"code.gitea.io/gitea/models"
 	"code.gitea.io/gitea/modules/context"
 	"code.gitea.io/gitea/modules/convert"
-	auth "code.gitea.io/gitea/modules/forms"
+	"code.gitea.io/gitea/modules/lfs"
 	"code.gitea.io/gitea/modules/log"
 	"code.gitea.io/gitea/modules/migrations"
 	"code.gitea.io/gitea/modules/migrations/base"
@@ -21,6 +21,7 @@ import (
 	"code.gitea.io/gitea/modules/task"
 	"code.gitea.io/gitea/modules/util"
 	"code.gitea.io/gitea/modules/web"
+	"code.gitea.io/gitea/services/forms"
 )
 
 // Migrate migrate remote git repository to gitea
@@ -56,6 +57,21 @@ func Migrate(ctx *context.APIContext) {
 	if form.Mirror && setting.Repository.DisableMirrors {
 		ctx.Error(http.StatusForbidden, "MirrorsGlobalDisabled", fmt.Errorf("the site administrator has disabled mirrors"))
 		return
+	}
+
+	form.LFS = form.LFS && setting.LFS.StartServer
+
+	if form.LFS && len(form.LFSEndpoint) > 0 {
+		ep := lfs.DetermineEndpoint("", form.LFSEndpoint)
+		if ep == nil {
+			ctx.Error(http.StatusInternalServerError, "", ctx.Tr("repo.migrate.invalid_lfs_endpoint"))
+			return
+		}
+		err := migrations.IsMigrateURLAllowed(ep.String(), ctx.User)
+		if err != nil {
+			handleRemoteAddrError(ctx, err)
+			return
+		}
 	}
 
 	var (
@@ -102,32 +118,12 @@ func Migrate(ctx *context.APIContext) {
 		}
 	}
 
-	remoteAddr, err := auth.ParseRemoteAddr(form.CloneAddr, form.AuthUsername, form.AuthPassword)
+	remoteAddr, err := forms.ParseRemoteAddr(form.CloneAddr, form.AuthUsername, form.AuthPassword)
 	if err == nil {
 		err = migrations.IsMigrateURLAllowed(remoteAddr, ctx.User)
 	}
 	if err != nil {
-		if models.IsErrInvalidCloneAddr(err) {
-			addrErr := err.(*models.ErrInvalidCloneAddr)
-			switch {
-			case addrErr.IsURLError:
-				ctx.Error(http.StatusUnprocessableEntity, "", err)
-			case addrErr.IsPermissionDenied:
-				if addrErr.LocalPath {
-					ctx.Error(http.StatusUnprocessableEntity, "", "You are not allowed to import local repositories.")
-				} else if len(addrErr.PrivateNet) == 0 {
-					ctx.Error(http.StatusUnprocessableEntity, "", "You are not allowed to import from blocked hosts.")
-				} else {
-					ctx.Error(http.StatusUnprocessableEntity, "", "You are not allowed to import from private IPs.")
-				}
-			case addrErr.IsInvalidPath:
-				ctx.Error(http.StatusUnprocessableEntity, "", "Invalid local path, it does not exist or not a directory.")
-			default:
-				ctx.Error(http.StatusInternalServerError, "ParseRemoteAddr", "Unknown error type (ErrInvalidCloneAddr): "+err.Error())
-			}
-		} else {
-			ctx.Error(http.StatusInternalServerError, "ParseRemoteAddr", err)
-		}
+		handleRemoteAddrError(ctx, err)
 		return
 	}
 
@@ -138,7 +134,9 @@ func Migrate(ctx *context.APIContext) {
 		RepoName:       form.RepoName,
 		Description:    form.Description,
 		Private:        form.Private || setting.Repository.ForcePrivate,
-		Mirror:         form.Mirror && !setting.Repository.DisableMirrors,
+		Mirror:         form.Mirror,
+		LFS:            form.LFS,
+		LFSEndpoint:    form.LFSEndpoint,
 		AuthUsername:   form.AuthUsername,
 		AuthPassword:   form.AuthPassword,
 		AuthToken:      form.AuthToken,
@@ -199,8 +197,8 @@ func handleMigrateError(ctx *context.APIContext, repoOwner *models.User, migrati
 	case base.IsErrNotSupported(err):
 		ctx.Error(http.StatusUnprocessableEntity, "", err)
 	default:
-		remoteAddr, _ := auth.ParseRemoteAddr(migrationOpts.CloneAddr, migrationOpts.AuthUsername, migrationOpts.AuthPassword)
-		err = util.URLSanitizedError(err, remoteAddr)
+		remoteAddr, _ := forms.ParseRemoteAddr(migrationOpts.CloneAddr, migrationOpts.AuthUsername, migrationOpts.AuthPassword)
+		err = util.NewStringURLSanitizedError(err, remoteAddr, true)
 		if strings.Contains(err.Error(), "Authentication failed") ||
 			strings.Contains(err.Error(), "Bad credentials") ||
 			strings.Contains(err.Error(), "could not read Username") {
@@ -230,7 +228,7 @@ func GetMigratingTask(ctx *context.APIContext) {
 	//     "$ref": "#/responses/"
 	//   "404":
 	//	   "$ref": "#/response/"
-	t, err := models.GetMigratingTask(ctx.QueryInt64("repo_id"))
+	t, err := models.GetMigratingTask(ctx.FormInt64("repo_id"))
 
 	if err != nil {
 		ctx.JSON(http.StatusNotFound, err)
@@ -239,9 +237,33 @@ func GetMigratingTask(ctx *context.APIContext) {
 
 	ctx.JSON(200, map[string]interface{}{
 		"status":  t.Status,
-		"err":     t.Errors,
+		"err":     t.Message,
 		"repo-id": t.RepoID,
 		"start":   t.StartTime,
 		"end":     t.EndTime,
 	})
+}
+
+func handleRemoteAddrError(ctx *context.APIContext, err error) {
+	if models.IsErrInvalidCloneAddr(err) {
+		addrErr := err.(*models.ErrInvalidCloneAddr)
+		switch {
+		case addrErr.IsURLError:
+			ctx.Error(http.StatusUnprocessableEntity, "", err)
+		case addrErr.IsPermissionDenied:
+			if addrErr.LocalPath {
+				ctx.Error(http.StatusUnprocessableEntity, "", "You are not allowed to import local repositories.")
+			} else if len(addrErr.PrivateNet) == 0 {
+				ctx.Error(http.StatusUnprocessableEntity, "", "You are not allowed to import from blocked hosts.")
+			} else {
+				ctx.Error(http.StatusUnprocessableEntity, "", "You are not allowed to import from private IPs.")
+			}
+		case addrErr.IsInvalidPath:
+			ctx.Error(http.StatusUnprocessableEntity, "", "Invalid local path, it does not exist or not a directory.")
+		default:
+			ctx.Error(http.StatusInternalServerError, "ParseRemoteAddr", "Unknown error type (ErrInvalidCloneAddr): "+err.Error())
+		}
+	} else {
+		ctx.Error(http.StatusInternalServerError, "ParseRemoteAddr", err)
+	}
 }

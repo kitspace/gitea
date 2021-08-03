@@ -169,6 +169,7 @@ func (session *Session) db() *core.DB {
 	return session.engine.db
 }
 
+// Engine returns session Engine
 func (session *Session) Engine() *Engine {
 	return session.engine
 }
@@ -373,6 +374,9 @@ func (session *Session) getField(dataStruct *reflect.Value, key string, table *s
 	fieldValue, err := col.ValueOfV(dataStruct)
 	if err != nil {
 		return nil, err
+	}
+	if fieldValue == nil {
+		return nil, ErrFieldIsNotValid{key, table.Name}
 	}
 
 	if !fieldValue.IsValid() || !fieldValue.CanSet() {
@@ -895,7 +899,7 @@ func (session *Session) incrVersionFieldValue(fieldValue *reflect.Value) {
 	}
 }
 
-// ContextHook sets the context on this session
+// Context sets the context on this session
 func (session *Session) Context(ctx context.Context) *Session {
 	session.ctx = ctx
 	return session

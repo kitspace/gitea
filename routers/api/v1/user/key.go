@@ -25,13 +25,13 @@ func appendPrivateInformation(apiKey *api.PublicKey, key *models.PublicKey, defa
 		apiKey.KeyType = "user"
 
 		if defaultUser.ID == key.OwnerID {
-			apiKey.Owner = convert.ToUser(defaultUser, true, true)
+			apiKey.Owner = convert.ToUser(defaultUser, defaultUser)
 		} else {
 			user, err := models.GetUserByID(key.OwnerID)
 			if err != nil {
 				return apiKey, err
 			}
-			apiKey.Owner = convert.ToUser(user, true, true)
+			apiKey.Owner = convert.ToUser(user, user)
 		}
 	} else {
 		apiKey.KeyType = "unknown"
@@ -48,7 +48,7 @@ func listPublicKeys(ctx *context.APIContext, user *models.User) {
 	var keys []*models.PublicKey
 	var err error
 
-	fingerprint := ctx.Query("fingerprint")
+	fingerprint := ctx.Form("fingerprint")
 	username := ctx.Params("username")
 
 	if fingerprint != "" {

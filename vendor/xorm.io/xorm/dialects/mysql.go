@@ -188,6 +188,43 @@ func (db *mysql) Init(uri *URI) error {
 	return db.Base.Init(db, uri)
 }
 
+func (db *mysql) Version(ctx context.Context, queryer core.Queryer) (*schemas.Version, error) {
+	rows, err := queryer.QueryContext(ctx, "SELECT @@VERSION")
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var version string
+	if !rows.Next() {
+		return nil, errors.New("Unknow version")
+	}
+
+	if err := rows.Scan(&version); err != nil {
+		return nil, err
+	}
+
+	fields := strings.Split(version, "-")
+	if len(fields) == 3 && fields[1] == "TiDB" {
+		// 5.7.25-TiDB-v3.0.3
+		return &schemas.Version{
+			Number:  strings.TrimPrefix(fields[2], "v"),
+			Level:   fields[0],
+			Edition: fields[1],
+		}, nil
+	}
+
+	var edition string
+	if len(fields) == 2 {
+		edition = fields[1]
+	}
+
+	return &schemas.Version{
+		Number:  fields[0],
+		Edition: edition,
+	}, nil
+}
+
 func (db *mysql) SetParams(params map[string]string) {
 	rowFormat, ok := params["rowFormat"]
 	if ok {
@@ -254,6 +291,10 @@ func (db *mysql) SQLType(c *schemas.Column) string {
 		c.Length = 40
 	case schemas.Json:
 		res = schemas.Text
+	case schemas.UnsignedInt:
+		res = schemas.Int
+	case schemas.UnsignedBigInt:
+		res = schemas.BigInt
 	default:
 		res = t
 	}
@@ -271,6 +312,11 @@ func (db *mysql) SQLType(c *schemas.Column) string {
 	} else if hasLen1 {
 		res += "(" + strconv.Itoa(c.Length) + ")"
 	}
+
+	if c.SQLType.Name == schemas.UnsignedBigInt || c.SQLType.Name == schemas.UnsignedInt {
+		res += " UNSIGNED"
+	}
+
 	return res
 }
 
@@ -331,16 +377,16 @@ func (db *mysql) GetColumns(queryer core.Queryer, ctx context.Context, tableName
 		col := new(schemas.Column)
 		col.Indexes = make(map[string]int)
 
-		var columnName, isNullable, colType, colKey, extra, comment string
-		var alreadyQuoted bool
+		var columnName, nullableStr, colType, colKey, extra, comment string
+		var alreadyQuoted, isUnsigned bool
 		var colDefault *string
-		err = rows.Scan(&columnName, &isNullable, &colDefault, &colType, &colKey, &extra, &comment, &alreadyQuoted)
+		err = rows.Scan(&columnName, &nullableStr, &colDefault, &colType, &colKey, &extra, &comment, &alreadyQuoted)
 		if err != nil {
 			return nil, nil, err
 		}
 		col.Name = strings.Trim(columnName, "` ")
 		col.Comment = comment
-		if "YES" == isNullable {
+		if nullableStr == "YES" {
 			col.Nullable = true
 		}
 
@@ -351,8 +397,15 @@ func (db *mysql) GetColumns(queryer core.Queryer, ctx context.Context, tableName
 			col.DefaultIsEmpty = true
 		}
 
+		fields := strings.Fields(colType)
+		if len(fields) == 2 && fields[1] == "unsigned" {
+			isUnsigned = true
+		}
+		colType = fields[0]
 		cts := strings.Split(colType, "(")
 		colName := cts[0]
+		// Remove the /* mariadb-5.3 */ suffix from coltypes
+		colName = strings.TrimSuffix(colName, "/* mariadb-5.3 */")
 		colType = strings.ToUpper(colName)
 		var len1, len2 int
 		if len(cts) == 2 {
@@ -387,11 +440,8 @@ func (db *mysql) GetColumns(queryer core.Queryer, ctx context.Context, tableName
 				}
 			}
 		}
-		if colType == "FLOAT UNSIGNED" {
-			colType = "FLOAT"
-		}
-		if colType == "DOUBLE UNSIGNED" {
-			colType = "DOUBLE"
+		if isUnsigned {
+			colType = "UNSIGNED " + colType
 		}
 		col.Length = len1
 		col.Length2 = len2

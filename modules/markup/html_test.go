@@ -28,7 +28,12 @@ func TestRender_Commits(t *testing.T) {
 	setting.AppSubURL = AppSubURL
 
 	test := func(input, expected string) {
-		buffer := RenderString(".md", input, setting.AppSubURL, localMetas)
+		buffer, err := RenderString(&RenderContext{
+			Filename:  ".md",
+			URLPrefix: setting.AppSubURL,
+			Metas:     localMetas,
+		}, input)
+		assert.NoError(t, err)
 		assert.Equal(t, strings.TrimSpace(expected), strings.TrimSpace(buffer))
 	}
 
@@ -59,7 +64,12 @@ func TestRender_CrossReferences(t *testing.T) {
 	setting.AppSubURL = AppSubURL
 
 	test := func(input, expected string) {
-		buffer := RenderString("a.md", input, setting.AppSubURL, localMetas)
+		buffer, err := RenderString(&RenderContext{
+			Filename:  "a.md",
+			URLPrefix: setting.AppSubURL,
+			Metas:     localMetas,
+		}, input)
+		assert.NoError(t, err)
 		assert.Equal(t, strings.TrimSpace(expected), strings.TrimSpace(buffer))
 	}
 
@@ -91,14 +101,18 @@ func TestRender_links(t *testing.T) {
 	setting.AppSubURL = AppSubURL
 
 	test := func(input, expected string) {
-		buffer := RenderString("a.md", input, setting.AppSubURL, nil)
+		buffer, err := RenderString(&RenderContext{
+			Filename:  "a.md",
+			URLPrefix: setting.AppSubURL,
+		}, input)
+		assert.NoError(t, err)
 		assert.Equal(t, strings.TrimSpace(expected), strings.TrimSpace(buffer))
 	}
 	// Text that should be turned into URL
 
 	defaultCustom := setting.Markdown.CustomURLSchemes
 	setting.Markdown.CustomURLSchemes = []string{"ftp", "magnet"}
-	ReplaceSanitizer()
+	InitializeSanitizer()
 	CustomLinkURLSchemes(setting.Markdown.CustomURLSchemes)
 
 	test(
@@ -124,13 +138,13 @@ func TestRender_links(t *testing.T) {
 		`<p><a href="http://www.example.com/wpstyle/?p=364" rel="nofollow">http://www.example.com/wpstyle/?p=364</a></p>`)
 	test(
 		"https://www.example.com/foo/?bar=baz&inga=42&quux",
-		`<p><a href="https://www.example.com/foo/?bar=baz&inga=42&quux=" rel="nofollow">https://www.example.com/foo/?bar=baz&amp;inga=42&amp;quux</a></p>`)
+		`<p><a href="https://www.example.com/foo/?bar=baz&amp;inga=42&amp;quux" rel="nofollow">https://www.example.com/foo/?bar=baz&amp;inga=42&amp;quux</a></p>`)
 	test(
 		"http://142.42.1.1/",
 		`<p><a href="http://142.42.1.1/" rel="nofollow">http://142.42.1.1/</a></p>`)
 	test(
 		"https://github.com/go-gitea/gitea/?p=aaa/bbb.html#ccc-ddd",
-		`<p><a href="https://github.com/go-gitea/gitea/?p=aaa%2Fbbb.html#ccc-ddd" rel="nofollow">https://github.com/go-gitea/gitea/?p=aaa/bbb.html#ccc-ddd</a></p>`)
+		`<p><a href="https://github.com/go-gitea/gitea/?p=aaa/bbb.html#ccc-ddd" rel="nofollow">https://github.com/go-gitea/gitea/?p=aaa/bbb.html#ccc-ddd</a></p>`)
 	test(
 		"https://en.wikipedia.org/wiki/URL_(disambiguation)",
 		`<p><a href="https://en.wikipedia.org/wiki/URL_(disambiguation)" rel="nofollow">https://en.wikipedia.org/wiki/URL_(disambiguation)</a></p>`)
@@ -148,7 +162,7 @@ func TestRender_links(t *testing.T) {
 		`<p><a href="ftp://gitea.com/file.txt" rel="nofollow">ftp://gitea.com/file.txt</a></p>`)
 	test(
 		"magnet:?xt=urn:btih:5dee65101db281ac9c46344cd6b175cdcadabcde&dn=download",
-		`<p><a href="magnet:?xt=urn%3Abtih%3A5dee65101db281ac9c46344cd6b175cdcadabcde&dn=download" rel="nofollow">magnet:?xt=urn:btih:5dee65101db281ac9c46344cd6b175cdcadabcde&amp;dn=download</a></p>`)
+		`<p><a href="magnet:?xt=urn:btih:5dee65101db281ac9c46344cd6b175cdcadabcde&amp;dn=download" rel="nofollow">magnet:?xt=urn:btih:5dee65101db281ac9c46344cd6b175cdcadabcde&amp;dn=download</a></p>`)
 
 	// Test that should *not* be turned into URL
 	test(
@@ -178,7 +192,7 @@ func TestRender_links(t *testing.T) {
 
 	// Restore previous settings
 	setting.Markdown.CustomURLSchemes = defaultCustom
-	ReplaceSanitizer()
+	InitializeSanitizer()
 	CustomLinkURLSchemes(setting.Markdown.CustomURLSchemes)
 }
 
@@ -187,8 +201,12 @@ func TestRender_email(t *testing.T) {
 	setting.AppSubURL = AppSubURL
 
 	test := func(input, expected string) {
-		buffer := RenderString("a.md", input, setting.AppSubURL, nil)
-		assert.Equal(t, strings.TrimSpace(expected), strings.TrimSpace(buffer))
+		res, err := RenderString(&RenderContext{
+			Filename:  "a.md",
+			URLPrefix: setting.AppSubURL,
+		}, input)
+		assert.NoError(t, err)
+		assert.Equal(t, strings.TrimSpace(expected), strings.TrimSpace(res))
 	}
 	// Text that should be turned into email link
 
@@ -242,7 +260,11 @@ func TestRender_emoji(t *testing.T) {
 
 	test := func(input, expected string) {
 		expected = strings.ReplaceAll(expected, "&", "&amp;")
-		buffer := RenderString("a.md", input, setting.AppSubURL, nil)
+		buffer, err := RenderString(&RenderContext{
+			Filename:  "a.md",
+			URLPrefix: setting.AppSubURL,
+		}, input)
+		assert.NoError(t, err)
 		assert.Equal(t, strings.TrimSpace(expected), strings.TrimSpace(buffer))
 	}
 
@@ -261,8 +283,19 @@ func TestRender_emoji(t *testing.T) {
 	//Text that should be turned into or recognized as emoji
 	test(
 		":gitea:",
-		`<p><span class="emoji" aria-label="gitea"><img alt=":gitea:" src="`+setting.StaticURLPrefix+`/img/emoji/gitea.png"/></span></p>`)
-
+		`<p><span class="emoji" aria-label="gitea"><img alt=":gitea:" src="`+setting.StaticURLPrefix+`/assets/img/emoji/gitea.png"/></span></p>`)
+	test(
+		":custom-emoji:",
+		`<p>:custom-emoji:</p>`)
+	setting.UI.CustomEmojisMap["custom-emoji"] = ":custom-emoji:"
+	test(
+		":custom-emoji:",
+		`<p><span class="emoji" aria-label="custom-emoji"><img alt=":custom-emoji:" src="`+setting.StaticURLPrefix+`/assets/img/emoji/custom-emoji.png"/></span></p>`)
+	test(
+		"这是字符:1::+1: some🐊 \U0001f44d:custom-emoji: :gitea:",
+		`<p>这是字符:1:<span class="emoji" aria-label="thumbs up">👍</span> some<span class="emoji" aria-label="crocodile">🐊</span> `+
+			`<span class="emoji" aria-label="thumbs up">👍</span><span class="emoji" aria-label="custom-emoji"><img alt=":custom-emoji:" src="`+setting.StaticURLPrefix+`/assets/img/emoji/custom-emoji.png"/></span> `+
+			`<span class="emoji" aria-label="gitea"><img alt=":gitea:" src="`+setting.StaticURLPrefix+`/assets/img/emoji/gitea.png"/></span></p>`)
 	test(
 		"Some text with 😄 in the middle",
 		`<p>Some text with <span class="emoji" aria-label="grinning face with smiling eyes">😄</span> in the middle</p>`)
@@ -291,9 +324,17 @@ func TestRender_ShortLinks(t *testing.T) {
 	tree := util.URLJoin(AppSubURL, "src", "master")
 
 	test := func(input, expected, expectedWiki string) {
-		buffer := markdown.RenderString(input, tree, nil)
+		buffer, err := markdown.RenderString(&RenderContext{
+			URLPrefix: tree,
+		}, input)
+		assert.NoError(t, err)
 		assert.Equal(t, strings.TrimSpace(expected), strings.TrimSpace(buffer))
-		buffer = markdown.RenderWiki([]byte(input), setting.AppSubURL, localMetas)
+		buffer, err = markdown.RenderString(&RenderContext{
+			URLPrefix: setting.AppSubURL,
+			Metas:     localMetas,
+			IsWiki:    true,
+		}, input)
+		assert.NoError(t, err)
 		assert.Equal(t, strings.TrimSpace(expectedWiki), strings.TrimSpace(buffer))
 	}
 
@@ -384,6 +425,41 @@ func TestRender_ShortLinks(t *testing.T) {
 		`<p><a href="https://example.org" rel="nofollow">[[foobar]]</a></p>`)
 }
 
+func TestRender_RelativeImages(t *testing.T) {
+	setting.AppURL = AppURL
+	setting.AppSubURL = AppSubURL
+	tree := util.URLJoin(AppSubURL, "src", "master")
+
+	test := func(input, expected, expectedWiki string) {
+		buffer, err := markdown.RenderString(&RenderContext{
+			URLPrefix: tree,
+			Metas:     localMetas,
+		}, input)
+		assert.NoError(t, err)
+		assert.Equal(t, strings.TrimSpace(expected), strings.TrimSpace(buffer))
+		buffer, err = markdown.RenderString(&RenderContext{
+			URLPrefix: setting.AppSubURL,
+			Metas:     localMetas,
+			IsWiki:    true,
+		}, input)
+		assert.NoError(t, err)
+		assert.Equal(t, strings.TrimSpace(expectedWiki), strings.TrimSpace(buffer))
+	}
+
+	rawwiki := util.URLJoin(AppSubURL, "wiki", "raw")
+	mediatree := util.URLJoin(AppSubURL, "media", "master")
+
+	test(
+		`<img src="Link">`,
+		`<img src="`+util.URLJoin(mediatree, "Link")+`"/>`,
+		`<img src="`+util.URLJoin(rawwiki, "Link")+`"/>`)
+
+	test(
+		`<img src="./icon.png">`,
+		`<img src="`+util.URLJoin(mediatree, "icon.png")+`"/>`,
+		`<img src="`+util.URLJoin(rawwiki, "icon.png")+`"/>`)
+}
+
 func Test_ParseClusterFuzz(t *testing.T) {
 	setting.AppURL = AppURL
 	setting.AppSubURL = AppSubURL
@@ -395,16 +471,58 @@ func Test_ParseClusterFuzz(t *testing.T) {
 
 	data := "<A><maTH><tr><MN><bodY ÿ><temPlate></template><tH><tr></A><tH><d<bodY "
 
-	val, err := PostProcess([]byte(data), "https://example.com", localMetas, false)
-
+	var res strings.Builder
+	err := PostProcess(&RenderContext{
+		URLPrefix: "https://example.com",
+		Metas:     localMetas,
+	}, strings.NewReader(data), &res)
 	assert.NoError(t, err)
-	assert.NotContains(t, string(val), "<html")
+	assert.NotContains(t, res.String(), "<html")
 
 	data = "<!DOCTYPE html>\n<A><maTH><tr><MN><bodY ÿ><temPlate></template><tH><tr></A><tH><d<bodY "
 
-	val, err = PostProcess([]byte(data), "https://example.com", localMetas, false)
+	res.Reset()
+	err = PostProcess(&RenderContext{
+		URLPrefix: "https://example.com",
+		Metas:     localMetas,
+	}, strings.NewReader(data), &res)
 
 	assert.NoError(t, err)
+	assert.NotContains(t, res.String(), "<html")
+}
 
-	assert.NotContains(t, string(val), "<html")
+func TestIssue16020(t *testing.T) {
+	setting.AppURL = AppURL
+	setting.AppSubURL = AppSubURL
+
+	var localMetas = map[string]string{
+		"user": "go-gitea",
+		"repo": "gitea",
+	}
+
+	data := `<img src="data:image/png;base64,i//V"/>`
+
+	var res strings.Builder
+	err := PostProcess(&RenderContext{
+		URLPrefix: "https://example.com",
+		Metas:     localMetas,
+	}, strings.NewReader(data), &res)
+	assert.NoError(t, err)
+	assert.Equal(t, data, res.String())
+}
+
+func BenchmarkEmojiPostprocess(b *testing.B) {
+	data := "🥰 "
+	for len(data) < 1<<16 {
+		data += data
+	}
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		var res strings.Builder
+		err := PostProcess(&RenderContext{
+			URLPrefix: "https://example.com",
+			Metas:     localMetas,
+		}, strings.NewReader(data), &res)
+		assert.NoError(b, err)
+	}
 }

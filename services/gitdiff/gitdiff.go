@@ -25,12 +25,14 @@ import (
 	"code.gitea.io/gitea/modules/charset"
 	"code.gitea.io/gitea/modules/git"
 	"code.gitea.io/gitea/modules/highlight"
+	"code.gitea.io/gitea/modules/lfs"
 	"code.gitea.io/gitea/modules/log"
 	"code.gitea.io/gitea/modules/process"
 	"code.gitea.io/gitea/modules/setting"
 
 	"github.com/sergi/go-diff/diffmatchpatch"
 	stdcharset "golang.org/x/net/html/charset"
+	"golang.org/x/text/encoding"
 	"golang.org/x/text/transform"
 )
 
@@ -573,21 +575,22 @@ func (diffSection *DiffSection) GetComputedInlineDiffFor(diffLine *DiffLine) tem
 
 // DiffFile represents a file diff.
 type DiffFile struct {
-	Name               string
-	OldName            string
-	Index              int
-	Addition, Deletion int
-	Type               DiffFileType
-	IsCreated          bool
-	IsDeleted          bool
-	IsBin              bool
-	IsLFSFile          bool
-	IsRenamed          bool
-	IsAmbiguous        bool
-	IsSubmodule        bool
-	Sections           []*DiffSection
-	IsIncomplete       bool
-	IsProtected        bool
+	Name                    string
+	OldName                 string
+	Index                   int
+	Addition, Deletion      int
+	Type                    DiffFileType
+	IsCreated               bool
+	IsDeleted               bool
+	IsBin                   bool
+	IsLFSFile               bool
+	IsRenamed               bool
+	IsAmbiguous             bool
+	IsSubmodule             bool
+	Sections                []*DiffSection
+	IsIncomplete            bool
+	IsIncompleteLineTooLong bool
+	IsProtected             bool
 }
 
 // GetType returns type of diff file.
@@ -881,35 +884,46 @@ parsingLoop:
 
 	}
 
-	// FIXME: There are numerous issues with this:
+	// TODO: There are numerous issues with this:
 	// - we might want to consider detecting encoding while parsing but...
 	// - we're likely to fail to get the correct encoding here anyway as we won't have enough information
-	// - and this doesn't really account for changes in encoding
-	var buf bytes.Buffer
+	var diffLineTypeBuffers = make(map[DiffLineType]*bytes.Buffer, 3)
+	var diffLineTypeDecoders = make(map[DiffLineType]*encoding.Decoder, 3)
+	diffLineTypeBuffers[DiffLinePlain] = new(bytes.Buffer)
+	diffLineTypeBuffers[DiffLineAdd] = new(bytes.Buffer)
+	diffLineTypeBuffers[DiffLineDel] = new(bytes.Buffer)
 	for _, f := range diff.Files {
-		buf.Reset()
+		for _, buffer := range diffLineTypeBuffers {
+			buffer.Reset()
+		}
 		for _, sec := range f.Sections {
 			for _, l := range sec.Lines {
 				if l.Type == DiffLineSection {
 					continue
 				}
-				buf.WriteString(l.Content[1:])
-				buf.WriteString("\n")
+				diffLineTypeBuffers[l.Type].WriteString(l.Content[1:])
+				diffLineTypeBuffers[l.Type].WriteString("\n")
 			}
 		}
-		charsetLabel, err := charset.DetectEncoding(buf.Bytes())
-		if charsetLabel != "UTF-8" && err == nil {
-			encoding, _ := stdcharset.Lookup(charsetLabel)
-			if encoding != nil {
-				d := encoding.NewDecoder()
-				for _, sec := range f.Sections {
-					for _, l := range sec.Lines {
-						if l.Type == DiffLineSection {
-							continue
-						}
-						if c, _, err := transform.String(d, l.Content[1:]); err == nil {
-							l.Content = l.Content[0:1] + c
-						}
+		for lineType, buffer := range diffLineTypeBuffers {
+			diffLineTypeDecoders[lineType] = nil
+			if buffer.Len() == 0 {
+				continue
+			}
+			charsetLabel, err := charset.DetectEncoding(buffer.Bytes())
+			if charsetLabel != "UTF-8" && err == nil {
+				encoding, _ := stdcharset.Lookup(charsetLabel)
+				if encoding != nil {
+					diffLineTypeDecoders[lineType] = encoding.NewDecoder()
+				}
+			}
+		}
+		for _, sec := range f.Sections {
+			for _, l := range sec.Lines {
+				decoder := diffLineTypeDecoders[l.Type]
+				if decoder != nil {
+					if c, _, err := transform.String(decoder, l.Content[1:]); err == nil {
+						l.Content = l.Content[0:1] + c
 					}
 				}
 			}
@@ -934,6 +948,7 @@ func parseHunks(curFile *DiffFile, maxLines, maxLineCharacters int, input *bufio
 	for {
 		for isFragment {
 			curFile.IsIncomplete = true
+			curFile.IsIncompleteLineTooLong = true
 			_, isFragment, err = input.ReadLine()
 			if err != nil {
 				// Now by the definition of ReadLine this cannot be io.EOF
@@ -1014,6 +1029,11 @@ func parseHunks(curFile *DiffFile, maxLines, maxLineCharacters int, input *bufio
 			}
 			diffLine := &DiffLine{Type: DiffLineAdd, RightIdx: rightLine}
 			rightLine++
+			if curSection == nil {
+				// Create a new section to represent this hunk
+				curSection = &DiffSection{}
+				curFile.Sections = append(curFile.Sections, curSection)
+			}
 			curSection.Lines = append(curSection.Lines, diffLine)
 		case '-':
 			curFileLinesCount++
@@ -1026,6 +1046,11 @@ func parseHunks(curFile *DiffFile, maxLines, maxLineCharacters int, input *bufio
 			if leftLine > 0 {
 				leftLine++
 			}
+			if curSection == nil {
+				// Create a new section to represent this hunk
+				curSection = &DiffSection{}
+				curFile.Sections = append(curFile.Sections, curSection)
+			}
 			curSection.Lines = append(curSection.Lines, diffLine)
 		case ' ':
 			curFileLinesCount++
@@ -1036,6 +1061,11 @@ func parseHunks(curFile *DiffFile, maxLines, maxLineCharacters int, input *bufio
 			diffLine := &DiffLine{Type: DiffLinePlain, LeftIdx: leftLine, RightIdx: rightLine}
 			leftLine++
 			rightLine++
+			if curSection == nil {
+				// Create a new section to represent this hunk
+				curSection = &DiffSection{}
+				curFile.Sections = append(curFile.Sections, curSection)
+			}
 			curSection.Lines = append(curSection.Lines, diffLine)
 		default:
 			// This is unexpected
@@ -1046,6 +1076,7 @@ func parseHunks(curFile *DiffFile, maxLines, maxLineCharacters int, input *bufio
 		line := string(lineBytes)
 		if isFragment {
 			curFile.IsIncomplete = true
+			curFile.IsIncompleteLineTooLong = true
 			for isFragment {
 				lineBytes, isFragment, err = input.ReadLine()
 				if err != nil {
@@ -1057,17 +1088,18 @@ func parseHunks(curFile *DiffFile, maxLines, maxLineCharacters int, input *bufio
 		}
 		if len(line) > maxLineCharacters {
 			curFile.IsIncomplete = true
+			curFile.IsIncompleteLineTooLong = true
 			line = line[:maxLineCharacters]
 		}
 		curSection.Lines[len(curSection.Lines)-1].Content = line
 
 		// handle LFS
-		if line[1:] == models.LFSMetaFileIdentifier {
+		if line[1:] == lfs.MetaFileIdentifier {
 			curFileLFSPrefix = true
-		} else if curFileLFSPrefix && strings.HasPrefix(line[1:], models.LFSMetaFileOidPrefix) {
-			oid := strings.TrimPrefix(line[1:], models.LFSMetaFileOidPrefix)
+		} else if curFileLFSPrefix && strings.HasPrefix(line[1:], lfs.MetaFileOidPrefix) {
+			oid := strings.TrimPrefix(line[1:], lfs.MetaFileOidPrefix)
 			if len(oid) == 64 {
-				m := &models.LFSMetaObject{Oid: oid}
+				m := &models.LFSMetaObject{Pointer: lfs.Pointer{Oid: oid}}
 				count, err := models.Count(m)
 
 				if err == nil && count > 0 {

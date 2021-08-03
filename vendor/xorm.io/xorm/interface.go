@@ -83,6 +83,7 @@ type EngineInterface interface {
 	Context(context.Context) *Session
 	CreateTables(...interface{}) error
 	DBMetas() ([]*schemas.Table, error)
+	DBVersion() (*schemas.Version, error)
 	Dialect() dialects.Dialect
 	DriverName() string
 	DropTables(...interface{}) error
@@ -101,6 +102,7 @@ type EngineInterface interface {
 	SetCacher(string, caches.Cacher)
 	SetConnMaxLifetime(time.Duration)
 	SetColumnMapper(names.Mapper)
+	SetTagIdentifier(string)
 	SetDefaultCacher(caches.Cacher)
 	SetLogger(logger interface{})
 	SetLogLevel(log.LogLevel)

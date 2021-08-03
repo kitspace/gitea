@@ -7,9 +7,9 @@ package models
 import (
 	"fmt"
 
+	"code.gitea.io/gitea/modules/json"
 	"code.gitea.io/gitea/modules/timeutil"
 
-	jsoniter "github.com/json-iterator/go"
 	"xorm.io/xorm"
 	"xorm.io/xorm/convert"
 )
@@ -28,13 +28,11 @@ type UnitConfig struct{}
 
 // FromDB fills up a UnitConfig from serialized format.
 func (cfg *UnitConfig) FromDB(bs []byte) error {
-	json := jsoniter.ConfigCompatibleWithStandardLibrary
-	return json.Unmarshal(bs, &cfg)
+	return JSONUnmarshalHandleDoubleEncode(bs, &cfg)
 }
 
 // ToDB exports a UnitConfig to a serialized format.
 func (cfg *UnitConfig) ToDB() ([]byte, error) {
-	json := jsoniter.ConfigCompatibleWithStandardLibrary
 	return json.Marshal(cfg)
 }
 
@@ -45,13 +43,11 @@ type ExternalWikiConfig struct {
 
 // FromDB fills up a ExternalWikiConfig from serialized format.
 func (cfg *ExternalWikiConfig) FromDB(bs []byte) error {
-	json := jsoniter.ConfigCompatibleWithStandardLibrary
-	return json.Unmarshal(bs, &cfg)
+	return JSONUnmarshalHandleDoubleEncode(bs, &cfg)
 }
 
 // ToDB exports a ExternalWikiConfig to a serialized format.
 func (cfg *ExternalWikiConfig) ToDB() ([]byte, error) {
-	json := jsoniter.ConfigCompatibleWithStandardLibrary
 	return json.Marshal(cfg)
 }
 
@@ -64,13 +60,11 @@ type ExternalTrackerConfig struct {
 
 // FromDB fills up a ExternalTrackerConfig from serialized format.
 func (cfg *ExternalTrackerConfig) FromDB(bs []byte) error {
-	json := jsoniter.ConfigCompatibleWithStandardLibrary
-	return json.Unmarshal(bs, &cfg)
+	return JSONUnmarshalHandleDoubleEncode(bs, &cfg)
 }
 
 // ToDB exports a ExternalTrackerConfig to a serialized format.
 func (cfg *ExternalTrackerConfig) ToDB() ([]byte, error) {
-	json := jsoniter.ConfigCompatibleWithStandardLibrary
 	return json.Marshal(cfg)
 }
 
@@ -83,36 +77,34 @@ type IssuesConfig struct {
 
 // FromDB fills up a IssuesConfig from serialized format.
 func (cfg *IssuesConfig) FromDB(bs []byte) error {
-	json := jsoniter.ConfigCompatibleWithStandardLibrary
-	return json.Unmarshal(bs, &cfg)
+	return JSONUnmarshalHandleDoubleEncode(bs, &cfg)
 }
 
 // ToDB exports a IssuesConfig to a serialized format.
 func (cfg *IssuesConfig) ToDB() ([]byte, error) {
-	json := jsoniter.ConfigCompatibleWithStandardLibrary
 	return json.Marshal(cfg)
 }
 
 // PullRequestsConfig describes pull requests config
 type PullRequestsConfig struct {
-	IgnoreWhitespaceConflicts bool
-	AllowMerge                bool
-	AllowRebase               bool
-	AllowRebaseMerge          bool
-	AllowSquash               bool
-	AllowManualMerge          bool
-	AutodetectManualMerge     bool
+	IgnoreWhitespaceConflicts     bool
+	AllowMerge                    bool
+	AllowRebase                   bool
+	AllowRebaseMerge              bool
+	AllowSquash                   bool
+	AllowManualMerge              bool
+	AutodetectManualMerge         bool
+	DefaultDeleteBranchAfterMerge bool
+	DefaultMergeStyle             MergeStyle
 }
 
 // FromDB fills up a PullRequestsConfig from serialized format.
 func (cfg *PullRequestsConfig) FromDB(bs []byte) error {
-	json := jsoniter.ConfigCompatibleWithStandardLibrary
-	return json.Unmarshal(bs, &cfg)
+	return JSONUnmarshalHandleDoubleEncode(bs, &cfg)
 }
 
 // ToDB exports a PullRequestsConfig to a serialized format.
 func (cfg *PullRequestsConfig) ToDB() ([]byte, error) {
-	json := jsoniter.ConfigCompatibleWithStandardLibrary
 	return json.Marshal(cfg)
 }
 
@@ -123,6 +115,15 @@ func (cfg *PullRequestsConfig) IsMergeStyleAllowed(mergeStyle MergeStyle) bool {
 		mergeStyle == MergeStyleRebaseMerge && cfg.AllowRebaseMerge ||
 		mergeStyle == MergeStyleSquash && cfg.AllowSquash ||
 		mergeStyle == MergeStyleManuallyMerged && cfg.AllowManualMerge
+}
+
+// GetDefaultMergeStyle returns the default merge style for this pull request
+func (cfg *PullRequestsConfig) GetDefaultMergeStyle() MergeStyle {
+	if len(cfg.DefaultMergeStyle) != 0 {
+		return cfg.DefaultMergeStyle
+	}
+
+	return MergeStyleMerge
 }
 
 // AllowedMergeStyleCount returns the total count of allowed merge styles for the PullRequestsConfig
