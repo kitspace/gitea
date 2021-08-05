@@ -57,8 +57,8 @@ func handle(data ...queue.Data) {
 }
 
 // MigrateRepository add migration repository to task
-func MigrateRepository(doer, u *models.User, opts base.MigrateOptions) error {
-	task, err := CreateMigrateTask(doer, u, opts)
+func MigrateRepository(doer, u *models.User, opts base.MigrateOptions) (*models.Repository, error) {
+	task, repo, err := createMigrationTask(doer, u, opts)
 	if err != nil {
 		return err
 	}
@@ -66,8 +66,8 @@ func MigrateRepository(doer, u *models.User, opts base.MigrateOptions) error {
 	return taskQueue.Push(task)
 }
 
-// CreateMigrateTask creates a migrate task
-func CreateMigrateTask(doer, u *models.User, opts base.MigrateOptions) (*models.Task, error) {
+// createMigrationTask creates a migrate task
+func createMigrationTask(doer, u *models.User, opts base.MigrateOptions) (*models.Task, *models.Repository, error) {
 	// encrypt credentials for persistence
 	var err error
 	opts.CloneAddrEncrypted, err = secret.EncryptSecret(setting.SecretKey, opts.CloneAddr)
