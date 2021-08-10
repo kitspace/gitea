@@ -245,6 +245,8 @@ func RegisterRoutes(m *web.Route) {
 	// for health check
 	m.Get("/", Home)
 	m.Get("/.well-known/openid-configuration", user.OIDCWellKnown)
+	m.Get("/__kitspace", Kitspace)
+	m.Get("/__kitspace/*", Kitspace)
 	m.Group("/explore", func() {
 		m.Get("", func(ctx *context.Context) {
 			ctx.Redirect(setting.AppSubURL + "/explore/repos")
@@ -260,6 +262,11 @@ func RegisterRoutes(m *web.Route) {
 
 	// ***** START: User *****
 	m.Group("/user", func() {
+		m.Group("/kitspace", func() {
+			m.Post("/sign_up", bindIgnErr(forms.RegisterForm{}), user.KitspaceSignUp)
+			m.Post("/sign_in", bindIgnErr(forms.SignInForm{}), user.KitspaceSignIn)
+		})
+
 		m.Get("/login", user.SignIn)
 		m.Post("/login", bindIgnErr(forms.SignInForm{}), user.SignInPost)
 		m.Group("", func() {
@@ -788,6 +795,8 @@ func RegisterRoutes(m *web.Route) {
 				m.Combo("/_upload/*", repo.MustBeAbleToUpload).
 					Get(repo.UploadFile).
 					Post(bindIgnErr(forms.UploadRepoFileForm{}), repo.UploadFilePost)
+				// Same as `/_upload/*` but returns JSON
+				m.Post("/upload/*", repo.MustBeAbleToUpload, bindIgnErr(forms.UploadRepoFileForm{}), repo.UploadFilePostJson)
 			}, context.RepoRefByType(context.RepoRefBranch), repo.MustBeEditable)
 			m.Group("", func() {
 				m.Post("/upload-file", repo.UploadFileToServer)
