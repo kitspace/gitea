@@ -228,7 +228,7 @@ func GetMigratingTask(ctx *context.APIContext) {
 	//     "$ref": "#/responses/"
 	//   "404":
 	//	   "$ref": "#/response/"
-	t, err := models.GetMigratingTask(ctx.QueryInt64("repo_id"))
+	t, err := models.GetMigratingTask(ctx.FormInt64("repo_id"))
 
 	if err != nil {
 		ctx.JSON(http.StatusNotFound, err)
@@ -237,7 +237,7 @@ func GetMigratingTask(ctx *context.APIContext) {
 
 	ctx.JSON(200, map[string]interface{}{
 		"status":  t.Status,
-		"err":     t.Errors,
+		"err":     t.Message,
 		"repo-id": t.RepoID,
 		"start":   t.StartTime,
 		"end":     t.EndTime,
