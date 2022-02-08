@@ -952,6 +952,8 @@ func RegisterRoutes(m *web.Route) {
 					Post(bindIgnErr(forms.CherryPickForm{}), repo.CherryPickPost)
 			}, repo.MustBeEditable)
 			m.Group("", func() {
+				// Same as `/_upload-file` but returns JSON
+				m.Post("/upload/*", bindIgnErr(forms.UploadRepoFileForm{}), repo.UploadFilePostJson)
 				m.Post("/upload-file", repo.UploadFileToServer)
 				m.Post("/upload-remove", bindIgnErr(forms.RemoveUploadFileForm{}), repo.RemoveUploadFileFromServer)
 			}, repo.MustBeEditable, repo.MustBeAbleToUpload)
