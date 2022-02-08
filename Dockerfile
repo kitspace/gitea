@@ -1,5 +1,5 @@
 #Build stage
-FROM golang:1.18-alpine3.16 AS build-env
+FROM golang:1.17-alpine3.16 AS build-env
 
 ARG GOPROXY
 ENV GOPROXY ${GOPROXY:-direct}
@@ -18,7 +18,7 @@ WORKDIR ${GOPATH}/src/code.gitea.io/gitea
 
 #Checkout version if set
 RUN if [ -n "${GITEA_VERSION}" ]; then git checkout "${GITEA_VERSION}"; fi \
- && make clean-all build
+  && make clean-all build
 
 # Begin env-to-ini build
 RUN go build contrib/environment-to-ini/environment-to-ini.go
@@ -29,28 +29,28 @@ LABEL maintainer="maintainers@gitea.io"
 EXPOSE 22 3000
 
 RUN apk --no-cache add \
-    bash \
-    ca-certificates \
-    curl \
-    gettext \
-    git \
-    linux-pam \
-    openssh \
-    s6 \
-    sqlite \
-    su-exec \
-    gnupg
+  bash \
+  ca-certificates \
+  curl \
+  gettext \
+  git \
+  linux-pam \
+  openssh \
+  s6 \
+  sqlite \
+  su-exec \
+  gnupg
 
 RUN addgroup \
-    -S -g 1000 \
-    git && \
+  -S -g 1000 \
+  git && \
   adduser \
-    -S -H -D \
-    -h /data/git \
-    -s /bin/bash \
-    -u 1000 \
-    -G git \
-    git && \
+  -S -H -D \
+  -h /data/git \
+  -s /bin/bash \
+  -u 1000 \
+  -G git \
+  git && \
   echo "git:*" | chpasswd -e
 
 ENV USER git
