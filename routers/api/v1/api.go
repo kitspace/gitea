@@ -820,6 +820,7 @@ func Routes(ctx gocontext.Context) *web.Route {
 						m.Post("/tests", context.ReferencesGitRepo(), context.RepoRefForAPI, repo.TestHook)
 					})
 				}, reqToken(), reqAdmin(), reqWebhooksEnabled())
+				m.Get("/collaborators/{collaborator}", reqAnyRepoReader(), repo.IsCollaborator)
 				m.Group("/collaborators", func() {
 					m.Get("", reqAnyRepoReader(), repo.ListCollaborators)
 					m.Group("/{collaborator}", func() {
@@ -828,7 +829,7 @@ func Routes(ctx gocontext.Context) *web.Route {
 							Delete(reqAdmin(), repo.DeleteCollaborator)
 						m.Get("/permission", repo.GetRepoPermissions)
 					}, reqToken())
-				}, reqToken())
+				})
 				m.Get("/assignees", reqToken(), reqAnyRepoReader(), repo.GetAssignees)
 				m.Get("/reviewers", reqToken(), reqAnyRepoReader(), repo.GetReviewers)
 				m.Group("/teams", func() {
