@@ -8,12 +8,13 @@ import (
 	"code.gitea.io/gitea/modules/log"
 	"code.gitea.io/gitea/modules/password"
 	"code.gitea.io/gitea/modules/setting"
-	"code.gitea.io/gitea/modules/timeutil"
 	"code.gitea.io/gitea/modules/web"
 	"code.gitea.io/gitea/services/auth"
 	"code.gitea.io/gitea/services/forms"
 	"code.gitea.io/gitea/services/mailer"
+	"code.gitea.io/gitea/modules/convert"
 )
+
 
 // KitspaceSignUp custom sign-up compatible with Kitspace architecture
 func KitspaceSignUp(ctx *context.Context) {
@@ -38,7 +39,7 @@ func KitspaceSignUp(ctx *context.Context) {
 	//     "$ref": "#/response/error
 	//   "422":
 	//     "$ref": "#/responses/validationError"
-	response := make(map[string]string)
+	response := make(map[string]interface{})
 	form := web.GetForm(ctx).(*forms.RegisterForm)
 
 	if len(form.Password) < setting.MinPasswordLength {
@@ -104,12 +105,10 @@ func KitspaceSignUp(ctx *context.Context) {
 		}
 	}
 
+	handleSignInFull(ctx, u, true, false)
+
 	// Return the success response with user details
-	response["email"] = u.Email
-	response["ActiveCodeLives"] = timeutil.MinutesToFriendly(
-		setting.Service.ActiveCodeLives,
-		ctx.Locale.Language(),
-	)
+	response["user"] = convert.ToUser(u, u)
 
 	ctx.JSON(http.StatusCreated, response)
 }
@@ -143,7 +142,7 @@ func KitspaceSignIn(ctx *context.Context) {
 	form := web.GetForm(ctx).(*forms.SignInForm)
 	u, err := auth.UserSignIn(form.UserName, form.Password)
 
-	response := make(map[string]string)
+	response := make(map[string]interface{})
 	if err != nil {
 		switch {
 		case models.IsErrUserNotExist(err):
@@ -184,6 +183,7 @@ func KitspaceSignIn(ctx *context.Context) {
 	}
 	handleSignInFull(ctx, u, form.Remember, false)
 
-	response["LoggedInSuccessfully"] = u.Name
+	response["user"] = convert.ToUser(u, u)
+
 	ctx.JSON(http.StatusOK, response)
 }
