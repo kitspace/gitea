@@ -812,6 +812,7 @@ func Routes() *web.Route {
 						m.Post("/tests", context.ReferencesGitRepo(), context.RepoRefForAPI, repo.TestHook)
 					})
 				}, reqToken(), reqAdmin(), reqWebhooksEnabled())
+				m.Get("/collaborators/{collaborator}", reqAnyRepoReader(), repo.IsCollaborator)
 				m.Group("/collaborators", func() {
 					m.Get("", reqAnyRepoReader(), repo.ListCollaborators)
 					m.Group("/{collaborator}", func() {
