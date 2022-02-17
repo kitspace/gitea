@@ -22,3 +22,42 @@ jobs:
           auto_approve: false
           auto_merge: true
           token: ${{ secrets.GITHUB_TOKEN }}
+
+  open_pr:
+    name: Update submodule after syncing
+    runs-on: ubuntu-20.04
+    needs:
+      - sync
+
+    steps:
+      - name: Configure git
+        run: |
+          git config --global pull.rebase false
+          git config --global user.email auto-merge-bot@kitspace.dev
+          git config --global user.name "Kitspace Auto-Merge Bot"
+      - name: Check out gitea repo
+        uses: actions/checkout@v2
+      - name: Get gitea SHA
+        id: sha
+        shell: bash
+        run: |
+          echo "::set-output name=gitea_sha_short::$(git log --format=%h -n1)"
+      - name: Check out kitspace repo
+        uses: actions/checkout@v2
+        with:
+          repository: kitspace/kitspace-v2
+      - name: Update submodule
+        run: |
+          git submodule update --init
+          cd gitea
+          git checkout ${{ steps.sha.outputs.gitea_sha_short }}
+          cd ..
+          git commit -am "Deps: update gite@${{ steps.sha.outputs.gitea_sha_short }}"
+      - name: Open PR
+        uses: peter-evans/create-pull-request@v3
+        with:
+          delete-branch: true
+          reviewers: kasbah,AbdulrhmnGhanem
+          title: Auto update gitea
+          labels: dependencies
+          token: ${{ secrets.PAT }}
