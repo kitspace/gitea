@@ -43,6 +43,14 @@ func KitspaceSignUp(ctx *context.Context) {
 	response := make(map[string]interface{})
 	form := web.GetForm(ctx).(*forms.RegisterForm)
 
+	if !form.IsEmailDomainAllowed() {
+		response["error"] = "UnprocessableEntity"
+		response["message"] = "Email domain is blacklisted."
+
+		ctx.JSON(http.StatusUnprocessableEntity, response)
+		return
+	}
+
 	if len(form.Password) < setting.MinPasswordLength {
 		response["error"] = "UnprocessableEntity"
 		response["message"] = "Password is too short."
@@ -55,6 +63,21 @@ func KitspaceSignUp(ctx *context.Context) {
 		response["error"] = "UnprocessableEntity"
 		response["message"] = "Password isn't complex enough."
 
+		ctx.JSON(http.StatusUnprocessableEntity, response)
+		return
+	}
+
+	pwned, err := password.IsPwned(ctx, form.Password)
+	if pwned {
+		errMsg := ctx.Tr("auth.password_pwned")
+		if err != nil {
+			log.Error(err.Error())
+			errMsg = ctx.Tr("auth.password_pwned_err")
+			ctx.ServerError(errMsg, err)
+			return
+		}
+		response["error"] = "UnprocessableEntity"
+		response["message"] = errMsg
 		ctx.JSON(http.StatusUnprocessableEntity, response)
 		return
 	}
