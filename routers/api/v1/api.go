@@ -814,7 +814,7 @@ func Routes() *web.Route {
 				m.Get("/collaborators/{collaborator}", reqAnyRepoReader(), repo.IsCollaborator)
 				m.Group("/collaborators", func() {
 					m.Get("", reqAnyRepoReader(), repo.ListCollaborators)
-					m.Combo("/{collaborator}").
+					m.Combo("/{collaborator}").Get(reqAnyRepoReader(), repo.IsCollaborator).
 						Put(reqAdmin(), bind(api.AddCollaboratorOption{}), repo.AddCollaborator).
 						Delete(reqAdmin(), repo.DeleteCollaborator)
 				}, reqToken())
