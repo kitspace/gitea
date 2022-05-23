@@ -9,8 +9,6 @@ import (
 	"fmt"
 
 	"code.gitea.io/gitea/models"
-	admin_model "code.gitea.io/gitea/models/admin"
-	"code.gitea.io/gitea/models/db"
 	"code.gitea.io/gitea/models/organization"
 	packages_model "code.gitea.io/gitea/models/packages"
 	repo_model "code.gitea.io/gitea/models/repo"
@@ -18,7 +16,7 @@ import (
 	"code.gitea.io/gitea/modules/log"
 	"code.gitea.io/gitea/modules/notification"
 	repo_module "code.gitea.io/gitea/modules/repository"
-	"code.gitea.io/gitea/modules/setting"
+	cfg "code.gitea.io/gitea/modules/setting"
 	pull_service "code.gitea.io/gitea/services/pull"
 )
 
@@ -69,7 +67,7 @@ func PushCreateRepo(authUser, owner *user_model.User, repoName string) (*repo_mo
 
 	repo, err := CreateRepository(authUser, owner, models.CreateRepoOptions{
 		Name:      repoName,
-		IsPrivate: setting.Repository.DefaultPushCreatePrivate,
+		IsPrivate: cfg.Repository.DefaultPushCreatePrivate,
 	})
 	if err != nil {
 		return nil, err
@@ -78,10 +76,8 @@ func PushCreateRepo(authUser, owner *user_model.User, repoName string) (*repo_mo
 	return repo, nil
 }
 
-// Init start repository service
-func Init() error {
+// NewContext start repository service
+func NewContext() error {
 	repo_module.LoadRepoConfig()
-	admin_model.RemoveAllWithNotice(db.DefaultContext, "Clean up temporary repository uploads", setting.Repository.Upload.TempPath)
-	admin_model.RemoveAllWithNotice(db.DefaultContext, "Clean up temporary repositories", repo_module.LocalCopyPath())
 	return initPushQueue()
 }

@@ -5,8 +5,6 @@
 package issue
 
 import (
-	"context"
-
 	"code.gitea.io/gitea/models"
 	"code.gitea.io/gitea/models/db"
 	user_model "code.gitea.io/gitea/models/user"
@@ -16,16 +14,10 @@ import (
 
 // ChangeStatus changes issue status to open or closed.
 func ChangeStatus(issue *models.Issue, doer *user_model.User, closed bool) error {
-	return changeStatusCtx(db.DefaultContext, issue, doer, closed)
-}
-
-// changeStatusCtx changes issue status to open or closed.
-// TODO: if context is not db.DefaultContext we get a deadlock!!!
-func changeStatusCtx(ctx context.Context, issue *models.Issue, doer *user_model.User, closed bool) error {
-	comment, err := models.ChangeIssueStatus(ctx, issue, doer, closed)
+	comment, err := models.ChangeIssueStatus(issue, doer, closed)
 	if err != nil {
 		if models.IsErrDependenciesLeft(err) && closed {
-			if err := models.FinishIssueStopwatchIfPossible(ctx, doer, issue); err != nil {
+			if err := models.FinishIssueStopwatchIfPossible(db.DefaultContext, doer, issue); err != nil {
 				log.Error("Unable to stop stopwatch for issue[%d]#%d: %v", issue.ID, issue.Index, err)
 			}
 		}
@@ -33,7 +25,7 @@ func changeStatusCtx(ctx context.Context, issue *models.Issue, doer *user_model.
 	}
 
 	if closed {
-		if err := models.FinishIssueStopwatchIfPossible(ctx, doer, issue); err != nil {
+		if err := models.FinishIssueStopwatchIfPossible(db.DefaultContext, doer, issue); err != nil {
 			return err
 		}
 	}

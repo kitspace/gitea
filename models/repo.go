@@ -43,6 +43,9 @@ var ItemsPerPage = 40
 // NewRepoContext creates a new repository context
 func NewRepoContext() {
 	unit.LoadUnitConfig()
+
+	admin_model.RemoveAllWithNotice(db.DefaultContext, "Clean up temporary repository uploads", setting.Repository.Upload.TempPath)
+	admin_model.RemoveAllWithNotice(db.DefaultContext, "Clean up temporary repositories", LocalCopyPath())
 }
 
 // CheckRepoUnitUser check whether user could visit the unit of this repository
@@ -51,7 +54,7 @@ func CheckRepoUnitUser(repo *repo_model.Repository, user *user_model.User, unitT
 }
 
 func checkRepoUnitUser(ctx context.Context, repo *repo_model.Repository, user *user_model.User, unitType unit.Type) bool {
-	if user != nil && user.IsAdmin {
+	if user.IsAdmin {
 		return true
 	}
 	perm, err := GetUserRepoPermission(ctx, repo, user)
@@ -452,8 +455,8 @@ func CreateRepository(ctx context.Context, doer, u *user_model.User, repo *repo_
 			}
 		}
 
-		if isAdmin, err := IsUserRepoAdminCtx(ctx, repo, doer); err != nil {
-			return fmt.Errorf("IsUserRepoAdminCtx: %v", err)
+		if isAdmin, err := isUserRepoAdmin(ctx, repo, doer); err != nil {
+			return fmt.Errorf("isUserRepoAdmin: %v", err)
 		} else if !isAdmin {
 			// Make creator repo admin if it wasn't assigned automatically
 			if err = addCollaborator(ctx, repo, doer); err != nil {
@@ -524,8 +527,7 @@ func DecrementRepoForkNum(ctx context.Context, repoID int64) error {
 	return err
 }
 
-// UpdateRepositoryCtx updates a repository with db context
-func UpdateRepositoryCtx(ctx context.Context, repo *repo_model.Repository, visibilityChanged bool) (err error) {
+func updateRepository(ctx context.Context, repo *repo_model.Repository, visibilityChanged bool) (err error) {
 	repo.LowerName = strings.ToLower(repo.Name)
 
 	if utf8.RuneCountInString(repo.Description) > 255 {
@@ -577,13 +579,18 @@ func UpdateRepositoryCtx(ctx context.Context, repo *repo_model.Repository, visib
 		}
 		for i := range forkRepos {
 			forkRepos[i].IsPrivate = repo.IsPrivate || repo.Owner.Visibility == api.VisibleTypePrivate
-			if err = UpdateRepositoryCtx(ctx, forkRepos[i], true); err != nil {
+			if err = updateRepository(ctx, forkRepos[i], true); err != nil {
 				return fmt.Errorf("updateRepository[%d]: %v", forkRepos[i].ID, err)
 			}
 		}
 	}
 
 	return nil
+}
+
+// UpdateRepositoryCtx updates a repository with db context
+func UpdateRepositoryCtx(ctx context.Context, repo *repo_model.Repository, visibilityChanged bool) error {
+	return updateRepository(ctx, repo, visibilityChanged)
 }
 
 // UpdateRepository updates a repository
@@ -594,7 +601,7 @@ func UpdateRepository(repo *repo_model.Repository, visibilityChanged bool) (err 
 	}
 	defer committer.Close()
 
-	if err = UpdateRepositoryCtx(ctx, repo, visibilityChanged); err != nil {
+	if err = updateRepository(ctx, repo, visibilityChanged); err != nil {
 		return fmt.Errorf("updateRepository: %v", err)
 	}
 
@@ -697,6 +704,7 @@ func DeleteRepository(doer *user_model.User, uid, repoID int64) error {
 		&Notification{RepoID: repoID},
 		&ProtectedBranch{RepoID: repoID},
 		&ProtectedTag{RepoID: repoID},
+		&PullRequest{BaseRepoID: repoID},
 		&repo_model.PushMirror{RepoID: repoID},
 		&Release{RepoID: repoID},
 		&repo_model.RepoIndexerStatus{RepoID: repoID},
@@ -712,11 +720,6 @@ func DeleteRepository(doer *user_model.User, uid, repoID int64) error {
 
 	// Delete Labels and related objects
 	if err := deleteLabelsByRepoID(sess, repoID); err != nil {
-		return err
-	}
-
-	// Delete Pulls and related objects
-	if err := deletePullsByBaseRepoID(sess, repoID); err != nil {
 		return err
 	}
 
@@ -1212,7 +1215,7 @@ func DeleteDeployKey(ctx context.Context, doer *user_model.User, id int64) error
 		if err != nil {
 			return fmt.Errorf("GetRepositoryByID: %v", err)
 		}
-		has, err := IsUserRepoAdminCtx(ctx, repo, doer)
+		has, err := isUserRepoAdmin(ctx, repo, doer)
 		if err != nil {
 			return fmt.Errorf("GetUserRepoPermission: %v", err)
 		} else if !has {

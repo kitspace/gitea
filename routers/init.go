@@ -39,7 +39,6 @@ import (
 	web_routers "code.gitea.io/gitea/routers/web"
 	"code.gitea.io/gitea/services/auth"
 	"code.gitea.io/gitea/services/auth/source/oauth2"
-	"code.gitea.io/gitea/services/automerge"
 	"code.gitea.io/gitea/services/cron"
 	"code.gitea.io/gitea/services/mailer"
 	repo_migrations "code.gitea.io/gitea/services/migrations"
@@ -73,7 +72,7 @@ func mustInitCtx(ctx context.Context, fn func(ctx context.Context) error) {
 func InitGitServices() {
 	setting.NewServices()
 	mustInit(storage.Init)
-	mustInit(repo_service.Init)
+	mustInit(repo_service.NewContext)
 }
 
 func syncAppPathForGit(ctx context.Context) error {
@@ -116,9 +115,7 @@ func GlobalInitInstalled(ctx context.Context) {
 	// Setup i18n
 	translation.InitLocales()
 
-	setting.NewServices()
-	mustInit(storage.Init)
-
+	InitGitServices()
 	mailer.NewContext()
 	mustInit(cache.NewContext)
 	notification.NewContext()
@@ -140,7 +137,6 @@ func GlobalInitInstalled(ctx context.Context) {
 	mustInit(oauth2.Init)
 
 	models.NewRepoContext()
-	mustInit(repo_service.Init)
 
 	// Booting long running goroutines.
 	cron.NewContext(ctx)
@@ -151,7 +147,6 @@ func GlobalInitInstalled(ctx context.Context) {
 	mirror_service.InitSyncMirrors()
 	mustInit(webhook.Init)
 	mustInit(pull_service.Init)
-	mustInit(automerge.Init)
 	mustInit(task.Init)
 	mustInit(repo_migrations.Init)
 	eventsource.GetManager().Init()

@@ -9,11 +9,9 @@ import "code.gitea.io/gitea/modules/log"
 // Federation settings
 var (
 	Federation = struct {
-		Enabled             bool
-		ShareUserStatistics bool
+		Enabled bool
 	}{
-		Enabled:             true,
-		ShareUserStatistics: true,
+		Enabled: true,
 	}
 )
 

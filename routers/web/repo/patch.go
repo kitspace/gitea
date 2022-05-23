@@ -24,6 +24,8 @@ const (
 
 // NewDiffPatch render create patch page
 func NewDiffPatch(ctx *context.Context) {
+	ctx.Data["RequireHighlightJS"] = true
+
 	canCommit := renderCommitRights(ctx)
 
 	ctx.Data["TreePath"] = ""
@@ -52,6 +54,7 @@ func NewDiffPatchPost(ctx *context.Context) {
 	if form.CommitChoice == frmCommitChoiceNewBranch {
 		branchName = form.NewBranchName
 	}
+	ctx.Data["RequireHighlightJS"] = true
 	ctx.Data["TreePath"] = ""
 	ctx.Data["BranchLink"] = ctx.Repo.RepoLink + "/src/" + ctx.Repo.BranchNameSubURL()
 	ctx.Data["FileContent"] = form.Content

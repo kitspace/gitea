@@ -235,7 +235,6 @@ steps:
     image: docker:git
     pull: always
     commands:
-      - git config --global --add safe.directory /drone/src
       - git fetch --tags --force
     when:
       event:
@@ -428,7 +427,6 @@ steps:
     image: docker:git
     pull: always
     commands:
-      - git config --global --add safe.directory /drone/src
       - git fetch --tags --force
     when:
       event:
@@ -630,7 +628,6 @@ steps:
     image: docker:git
     pull: always
     commands:
-      - git config --global --add safe.directory /drone/src
       - git fetch --tags --force
 
   - name: deps-frontend
@@ -749,7 +746,6 @@ steps:
     image: docker:git
     pull: always
     commands:
-      - git config --global --add safe.directory /drone/src
       - git fetch --tags --force
 
   - name: deps-frontend
@@ -895,7 +891,6 @@ steps:
     image: docker:git
     pull: always
     commands:
-      - git config --global --add safe.directory /drone/src
       - git fetch --tags --force
 
   - name: publish
@@ -959,7 +954,6 @@ steps:
     image: docker:git
     pull: always
     commands:
-      - git config --global --add safe.directory /drone/src
       - git fetch --tags --force
 
   - name: publish
@@ -1022,7 +1016,6 @@ steps:
     image: docker:git
     pull: always
     commands:
-      - git config --global --add safe.directory /drone/src
       - git fetch --tags --force
 
   - name: publish
@@ -1119,7 +1112,6 @@ steps:
     image: docker:git
     pull: always
     commands:
-      - git config --global --add safe.directory /drone/src
       - git fetch --tags --force
 
   - name: publish
@@ -1183,7 +1175,6 @@ steps:
     image: docker:git
     pull: always
     commands:
-      - git config --global --add safe.directory /drone/src
       - git fetch --tags --force
 
   - name: publish
@@ -1246,7 +1237,6 @@ steps:
     image: docker:git
     pull: always
     commands:
-      - git config --global --add safe.directory /drone/src
       - git fetch --tags --force
 
   - name: publish

@@ -27,7 +27,6 @@ const (
 	TypeExternalWiki                // 6 ExternalWiki
 	TypeExternalTracker             // 7 ExternalTracker
 	TypeProjects                    // 8 Kanban board
-	TypePackages                    // 9 Packages
 )
 
 // Value returns integer value for unit type
@@ -53,8 +52,6 @@ func (u Type) String() string {
 		return "TypeExternalTracker"
 	case TypeProjects:
 		return "TypeProjects"
-	case TypePackages:
-		return "TypePackages"
 	}
 	return fmt.Sprintf("Unknown Type %d", u)
 }
@@ -77,7 +74,6 @@ var (
 		TypeExternalWiki,
 		TypeExternalTracker,
 		TypeProjects,
-		TypePackages,
 	}
 
 	// DefaultRepoUnits contains the default unit types
@@ -88,7 +84,6 @@ var (
 		TypeReleases,
 		TypeWiki,
 		TypeProjects,
-		TypePackages,
 	}
 
 	// NotAllowedDefaultRepoUnits contains units that can't be default
@@ -280,15 +275,6 @@ var (
 		perm.AccessModeOwner,
 	}
 
-	UnitPackages = Unit{
-		TypePackages,
-		"repo.packages",
-		"/packages",
-		"repo.packages.desc",
-		6,
-		perm.AccessModeRead,
-	}
-
 	// Units contains all the units
 	Units = map[Type]Unit{
 		TypeCode:            UnitCode,
@@ -299,7 +285,6 @@ var (
 		TypeWiki:            UnitWiki,
 		TypeExternalWiki:    UnitExternalWiki,
 		TypeProjects:        UnitProjects,
-		TypePackages:        UnitPackages,
 	}
 )
 

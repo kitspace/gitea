@@ -591,7 +591,7 @@ func ReplaceIssueLabels(issue *Issue, labels []*Label, doer *user_model.User) (e
 }
 
 // ReadBy sets issue to be read by given user.
-func (issue *Issue) ReadBy(ctx context.Context, userID int64) error {
+func (issue *Issue) ReadBy(userID int64) error {
 	if err := UpdateIssueUserByRead(userID, issue.ID); err != nil {
 		return err
 	}
@@ -635,7 +635,7 @@ func doChangeIssueStatus(ctx context.Context, issue *Issue, doer *user_model.Use
 	// Check for open dependencies
 	if issue.IsClosed && issue.Repo.IsDependenciesEnabledCtx(ctx) {
 		// only check if dependencies are enabled and we're about to close an issue, otherwise reopening an issue would fail when there are unsatisfied dependencies
-		noDeps, err := IssueNoDependenciesLeft(ctx, issue)
+		noDeps, err := issueNoDependenciesLeft(e, issue)
 		if err != nil {
 			return nil, err
 		}
@@ -693,7 +693,13 @@ func doChangeIssueStatus(ctx context.Context, issue *Issue, doer *user_model.Use
 }
 
 // ChangeIssueStatus changes issue status to open or closed.
-func ChangeIssueStatus(ctx context.Context, issue *Issue, doer *user_model.User, isClosed bool) (*Comment, error) {
+func ChangeIssueStatus(issue *Issue, doer *user_model.User, isClosed bool) (*Comment, error) {
+	ctx, committer, err := db.TxContext()
+	if err != nil {
+		return nil, err
+	}
+	defer committer.Close()
+
 	if err := issue.LoadRepo(ctx); err != nil {
 		return nil, err
 	}
@@ -701,7 +707,16 @@ func ChangeIssueStatus(ctx context.Context, issue *Issue, doer *user_model.User,
 		return nil, err
 	}
 
-	return changeIssueStatus(ctx, issue, doer, isClosed, false)
+	comment, err := changeIssueStatus(ctx, issue, doer, isClosed, false)
+	if err != nil {
+		return nil, err
+	}
+
+	if err = committer.Commit(); err != nil {
+		return nil, fmt.Errorf("Commit: %v", err)
+	}
+
+	return comment, nil
 }
 
 // ChangeIssueTitle changes the title of this issue, as the given user.
@@ -772,11 +787,16 @@ func ChangeIssueRef(issue *Issue, doer *user_model.User, oldRef string) (err err
 }
 
 // AddDeletePRBranchComment adds delete branch comment for pull request issue
-func AddDeletePRBranchComment(ctx context.Context, doer *user_model.User, repo *repo_model.Repository, issueID int64, branchName string) error {
-	issue, err := getIssueByID(db.GetEngine(ctx), issueID)
+func AddDeletePRBranchComment(doer *user_model.User, repo *repo_model.Repository, issueID int64, branchName string) error {
+	issue, err := getIssueByID(db.GetEngine(db.DefaultContext), issueID)
 	if err != nil {
 		return err
 	}
+	ctx, committer, err := db.TxContext()
+	if err != nil {
+		return err
+	}
+	defer committer.Close()
 	opts := &CreateCommentOptions{
 		Type:   CommentTypeDeleteBranch,
 		Doer:   doer,
@@ -784,8 +804,11 @@ func AddDeletePRBranchComment(ctx context.Context, doer *user_model.User, repo *
 		Issue:  issue,
 		OldRef: branchName,
 	}
-	_, err = CreateCommentCtx(ctx, opts)
-	return err
+	if _, err = CreateCommentCtx(ctx, opts); err != nil {
+		return err
+	}
+
+	return committer.Commit()
 }
 
 // UpdateIssueAttachments update attachments by UUIDs for the issue

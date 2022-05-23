@@ -143,11 +143,6 @@ func setCsvCompareContext(ctx *context.Context) {
 		if err == errTooLarge {
 			return CsvDiffResult{nil, err.Error()}
 		}
-		if err != nil {
-			log.Error("CreateCsvDiff error whilst creating baseReader from file %s in commit %s in %s: %v", diffFile.Name, baseCommit.ID.String(), ctx.Repo.Repository.Name, err)
-			return CsvDiffResult{nil, "unable to load file from base commit"}
-		}
-
 		headReader, headBlobCloser, err := csvReaderFromCommit(&markup.RenderContext{Ctx: ctx, Filename: diffFile.Name}, headCommit)
 		if headBlobCloser != nil {
 			defer headBlobCloser.Close()
@@ -155,17 +150,13 @@ func setCsvCompareContext(ctx *context.Context) {
 		if err == errTooLarge {
 			return CsvDiffResult{nil, err.Error()}
 		}
-		if err != nil {
-			log.Error("CreateCsvDiff error whilst creating headReader from file %s in commit %s in %s: %v", diffFile.Name, headCommit.ID.String(), ctx.Repo.Repository.Name, err)
-			return CsvDiffResult{nil, "unable to load file from head commit"}
-		}
 
 		sections, err := gitdiff.CreateCsvDiff(diffFile, baseReader, headReader)
 		if err != nil {
 			errMessage, err := csv_module.FormatError(err, ctx.Locale)
 			if err != nil {
-				log.Error("CreateCsvDiff FormatError failed: %v", err)
-				return CsvDiffResult{nil, "unknown csv diff error"}
+				log.Error("RenderCsvDiff failed: %v", err)
+				return CsvDiffResult{nil, ""}
 			}
 			return CsvDiffResult{nil, errMessage}
 		}
@@ -874,7 +865,7 @@ func ExcerptBlob(ctx *context.Context) {
 		}
 	}
 	ctx.Data["section"] = section
-	ctx.Data["FileNameHash"] = base.EncodeSha1(filePath)
+	ctx.Data["fileName"] = filePath
 	ctx.Data["AfterCommitID"] = commitID
 	ctx.Data["Anchor"] = anchor
 	ctx.HTML(http.StatusOK, tplBlobExcerpt)

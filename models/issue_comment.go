@@ -110,10 +110,6 @@ const (
 	CommentTypeDismissReview
 	// 33 Change issue ref
 	CommentTypeChangeIssueRef
-	// 34 pr was scheduled to auto merge when checks succeed
-	CommentTypePRScheduledToAutoMerge
-	// 35 pr was un scheduled to auto merge when checks succeed
-	CommentTypePRUnScheduledToAutoMerge
 )
 
 var commentStrings = []string{
@@ -151,8 +147,6 @@ var commentStrings = []string{
 	"project_board",
 	"dismiss_review",
 	"change_issue_ref",
-	"pull_scheduled_merge",
-	"pull_cancel_scheduled_merge",
 }
 
 func (t CommentType) String() string {
@@ -290,15 +284,14 @@ type PushActionContent struct {
 
 // LoadIssue loads issue from database
 func (c *Comment) LoadIssue() (err error) {
-	return c.LoadIssueCtx(db.DefaultContext)
+	return c.loadIssue(db.GetEngine(db.DefaultContext))
 }
 
-// LoadIssueCtx loads issue from database
-func (c *Comment) LoadIssueCtx(ctx context.Context) (err error) {
+func (c *Comment) loadIssue(e db.Engine) (err error) {
 	if c.Issue != nil {
 		return nil
 	}
-	c.Issue, err = getIssueByID(db.GetEngine(ctx), c.IssueID)
+	c.Issue, err = getIssueByID(e, c.IssueID)
 	return
 }
 
@@ -1133,7 +1126,7 @@ func UpdateComment(c *Comment, doer *user_model.User) error {
 	if _, err := sess.ID(c.ID).AllCols().Update(c); err != nil {
 		return err
 	}
-	if err := c.LoadIssueCtx(ctx); err != nil {
+	if err := c.loadIssue(sess); err != nil {
 		return err
 	}
 	if err := c.addCrossReferences(ctx, doer, true); err != nil {
@@ -1357,28 +1350,6 @@ func CreatePushPullComment(ctx context.Context, pusher *user_model.User, pr *Pul
 
 	comment, err = CreateComment(ops)
 
-	return
-}
-
-// CreateAutoMergeComment is a internal function, only use it for CommentTypePRScheduledToAutoMerge and CommentTypePRUnScheduledToAutoMerge CommentTypes
-func CreateAutoMergeComment(ctx context.Context, typ CommentType, pr *PullRequest, doer *user_model.User) (comment *Comment, err error) {
-	if typ != CommentTypePRScheduledToAutoMerge && typ != CommentTypePRUnScheduledToAutoMerge {
-		return nil, fmt.Errorf("comment type %d cannot be used to create an auto merge comment", typ)
-	}
-	if err = pr.LoadIssueCtx(ctx); err != nil {
-		return
-	}
-
-	if err = pr.LoadBaseRepoCtx(ctx); err != nil {
-		return
-	}
-
-	comment, err = CreateCommentCtx(ctx, &CreateCommentOptions{
-		Type:  typ,
-		Doer:  doer,
-		Repo:  pr.BaseRepo,
-		Issue: pr.Issue,
-	})
 	return
 }
 

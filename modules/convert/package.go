@@ -5,38 +5,28 @@
 package convert
 
 import (
-	"context"
-
-	"code.gitea.io/gitea/models"
 	"code.gitea.io/gitea/models/packages"
-	user_model "code.gitea.io/gitea/models/user"
+	"code.gitea.io/gitea/models/perm"
 	api "code.gitea.io/gitea/modules/structs"
 )
 
 // ToPackage convert a packages.PackageDescriptor to api.Package
-func ToPackage(ctx context.Context, pd *packages.PackageDescriptor, doer *user_model.User) (*api.Package, error) {
+func ToPackage(pd *packages.PackageDescriptor) *api.Package {
 	var repo *api.Repository
 	if pd.Repository != nil {
-		permission, err := models.GetUserRepoPermission(ctx, pd.Repository, doer)
-		if err != nil {
-			return nil, err
-		}
-
-		if permission.HasAccess() {
-			repo = ToRepo(pd.Repository, permission.AccessMode)
-		}
+		repo = ToRepo(pd.Repository, perm.AccessModeNone)
 	}
 
 	return &api.Package{
 		ID:         pd.Version.ID,
-		Owner:      ToUser(pd.Owner, doer),
+		Owner:      ToUser(pd.Owner, nil),
 		Repository: repo,
-		Creator:    ToUser(pd.Creator, doer),
+		Creator:    ToUser(pd.Creator, nil),
 		Type:       string(pd.Package.Type),
 		Name:       pd.Package.Name,
 		Version:    pd.Version.Version,
 		CreatedAt:  pd.Version.CreatedUnix.AsTime(),
-	}, nil
+	}
 }
 
 // ToPackageFile converts packages.PackageFileDescriptor to api.PackageFile

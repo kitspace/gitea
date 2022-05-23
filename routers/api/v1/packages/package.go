@@ -73,12 +73,7 @@ func ListPackages(ctx *context.APIContext) {
 
 	apiPackages := make([]*api.Package, 0, len(pds))
 	for _, pd := range pds {
-		apiPackage, err := convert.ToPackage(ctx, pd, ctx.Doer)
-		if err != nil {
-			ctx.Error(http.StatusInternalServerError, "Error converting package for api", err)
-			return
-		}
-		apiPackages = append(apiPackages, apiPackage)
+		apiPackages = append(apiPackages, convert.ToPackage(pd))
 	}
 
 	ctx.SetLinkHeader(int(count), listOptions.PageSize)
@@ -120,13 +115,7 @@ func GetPackage(ctx *context.APIContext) {
 	//   "404":
 	//     "$ref": "#/responses/notFound"
 
-	apiPackage, err := convert.ToPackage(ctx, ctx.Package.Descriptor, ctx.Doer)
-	if err != nil {
-		ctx.Error(http.StatusInternalServerError, "Error converting package for api", err)
-		return
-	}
-
-	ctx.JSON(http.StatusOK, apiPackage)
+	ctx.JSON(http.StatusOK, convert.ToPackage(ctx.Package.Descriptor))
 }
 
 // DeletePackage deletes a package

@@ -7,6 +7,7 @@
 // merges them into one profile
 
 //go:build ignore
+// +build ignore
 
 package main
 

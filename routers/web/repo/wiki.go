@@ -189,6 +189,7 @@ func renderViewPage(ctx *context.Context) (*git.Repository, *git.TreeEntry) {
 	ctx.Data["old_title"] = pageName
 	ctx.Data["Title"] = pageName
 	ctx.Data["title"] = pageName
+	ctx.Data["RequireHighlightJS"] = true
 
 	isSideBar := pageName == "_Sidebar"
 	isFooter := pageName == "_Footer"
@@ -307,6 +308,7 @@ func renderRevisionPage(ctx *context.Context) (*git.Repository, *git.TreeEntry) 
 	ctx.Data["old_title"] = pageName
 	ctx.Data["Title"] = pageName
 	ctx.Data["title"] = pageName
+	ctx.Data["RequireHighlightJS"] = true
 	ctx.Data["Username"] = ctx.Repo.Owner.Name
 	ctx.Data["Reponame"] = ctx.Repo.Repository.Name
 
@@ -382,6 +384,7 @@ func renderEditPage(ctx *context.Context) {
 	ctx.Data["old_title"] = pageName
 	ctx.Data["Title"] = pageName
 	ctx.Data["title"] = pageName
+	ctx.Data["RequireHighlightJS"] = true
 
 	// lookup filename in wiki - get filecontent, gitTree entry , real filename
 	data, entry, _, noEntry := wikiContentsByName(ctx, commit, pageName)
