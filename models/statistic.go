@@ -8,7 +8,9 @@ import (
 	asymkey_model "code.gitea.io/gitea/models/asymkey"
 	"code.gitea.io/gitea/models/auth"
 	"code.gitea.io/gitea/models/db"
+	issues_model "code.gitea.io/gitea/models/issues"
 	"code.gitea.io/gitea/models/organization"
+	access_model "code.gitea.io/gitea/models/perm/access"
 	project_model "code.gitea.io/gitea/models/project"
 	repo_model "code.gitea.io/gitea/models/repo"
 	user_model "code.gitea.io/gitea/models/user"
@@ -48,14 +50,14 @@ type IssueByRepositoryCount struct {
 // GetStatistic returns the database statistics
 func GetStatistic() (stats Statistic) {
 	e := db.GetEngine(db.DefaultContext)
-	stats.Counter.User = user_model.CountUsers()
-	stats.Counter.Org = organization.CountOrganizations()
+	stats.Counter.User = user_model.CountUsers(nil)
+	stats.Counter.Org, _ = organization.CountOrgs(organization.FindOrgOptions{IncludePrivate: true})
 	stats.Counter.PublicKey, _ = e.Count(new(asymkey_model.PublicKey))
-	stats.Counter.Repo = repo_model.CountRepositories(true)
+	stats.Counter.Repo, _ = repo_model.CountRepositories(db.DefaultContext, repo_model.CountRepositoryOptions{})
 	stats.Counter.Watch, _ = e.Count(new(repo_model.Watch))
 	stats.Counter.Star, _ = e.Count(new(repo_model.Star))
-	stats.Counter.Action, _ = e.Count(new(Action))
-	stats.Counter.Access, _ = e.Count(new(Access))
+	stats.Counter.Action, _ = db.EstimateCount(db.DefaultContext, new(Action))
+	stats.Counter.Access, _ = e.Count(new(access_model.Access))
 
 	type IssueCount struct {
 		Count    int64
@@ -102,7 +104,7 @@ func GetStatistic() (stats Statistic) {
 	stats.Counter.Release, _ = e.Count(new(Release))
 	stats.Counter.AuthSource = auth.CountSources()
 	stats.Counter.Webhook, _ = e.Count(new(webhook.Webhook))
-	stats.Counter.Milestone, _ = e.Count(new(Milestone))
+	stats.Counter.Milestone, _ = e.Count(new(issues_model.Milestone))
 	stats.Counter.Label, _ = e.Count(new(Label))
 	stats.Counter.HookTask, _ = e.Count(new(webhook.HookTask))
 	stats.Counter.Team, _ = e.Count(new(organization.Team))

@@ -13,21 +13,6 @@ import (
 	"code.gitea.io/gitea/modules/git"
 )
 
-// ErrNotExist represents a non-exist error.
-type ErrNotExist struct {
-	ID int64
-}
-
-// IsErrNotExist checks if an error is an ErrNotExist
-func IsErrNotExist(err error) bool {
-	_, ok := err.(ErrNotExist)
-	return ok
-}
-
-func (err ErrNotExist) Error() string {
-	return fmt.Sprintf("record does not exist [id: %d]", err.ID)
-}
-
 // ErrUserOwnRepos represents a "UserOwnRepos" kind of error.
 type ErrUserOwnRepos struct {
 	UID int64
@@ -296,7 +281,6 @@ type ErrInvalidCloneAddr struct {
 	IsProtocolInvalid  bool
 	IsPermissionDenied bool
 	LocalPath          bool
-	NotResolvedIP      bool
 }
 
 // IsErrInvalidCloneAddr checks if an error is a ErrInvalidCloneAddr.
@@ -306,9 +290,6 @@ func IsErrInvalidCloneAddr(err error) bool {
 }
 
 func (err *ErrInvalidCloneAddr) Error() string {
-	if err.NotResolvedIP {
-		return fmt.Sprintf("migration/cloning from '%s' is not allowed: unknown hostname", err.Host)
-	}
 	if err.IsInvalidPath {
 		return fmt.Sprintf("migration/cloning from '%s' is not allowed: the provided path is invalid", err.Host)
 	}
@@ -586,18 +567,18 @@ func (err ErrBranchesEqual) Error() string {
 	return fmt.Sprintf("branches are equal [head: %sm base: %s]", err.HeadBranchName, err.BaseBranchName)
 }
 
-// ErrNotAllowedToMerge represents an error that a branch is protected and the current user is not allowed to modify it.
-type ErrNotAllowedToMerge struct {
+// ErrDisallowedToMerge represents an error that a branch is protected and the current user is not allowed to modify it.
+type ErrDisallowedToMerge struct {
 	Reason string
 }
 
-// IsErrNotAllowedToMerge checks if an error is an ErrNotAllowedToMerge.
-func IsErrNotAllowedToMerge(err error) bool {
-	_, ok := err.(ErrNotAllowedToMerge)
+// IsErrDisallowedToMerge checks if an error is an ErrDisallowedToMerge.
+func IsErrDisallowedToMerge(err error) bool {
+	_, ok := err.(ErrDisallowedToMerge)
 	return ok
 }
 
-func (err ErrNotAllowedToMerge) Error() string {
+func (err ErrDisallowedToMerge) Error() string {
 	return fmt.Sprintf("not allowed to merge [reason: %s]", err.Reason)
 }
 
@@ -1046,33 +1027,6 @@ func IsErrLabelNotExist(err error) bool {
 
 func (err ErrLabelNotExist) Error() string {
 	return fmt.Sprintf("label does not exist [label_id: %d]", err.LabelID)
-}
-
-//    _____  .__.__                   __
-//   /     \ |__|  |   ____   _______/  |_  ____   ____   ____
-//  /  \ /  \|  |  | _/ __ \ /  ___/\   __\/  _ \ /    \_/ __ \
-// /    Y    \  |  |_\  ___/ \___ \  |  | (  <_> )   |  \  ___/
-// \____|__  /__|____/\___  >____  > |__|  \____/|___|  /\___  >
-//         \/             \/     \/                   \/     \/
-
-// ErrMilestoneNotExist represents a "MilestoneNotExist" kind of error.
-type ErrMilestoneNotExist struct {
-	ID     int64
-	RepoID int64
-	Name   string
-}
-
-// IsErrMilestoneNotExist checks if an error is a ErrMilestoneNotExist.
-func IsErrMilestoneNotExist(err error) bool {
-	_, ok := err.(ErrMilestoneNotExist)
-	return ok
-}
-
-func (err ErrMilestoneNotExist) Error() string {
-	if len(err.Name) > 0 {
-		return fmt.Sprintf("milestone does not exist [name: %s, repo_id: %d]", err.Name, err.RepoID)
-	}
-	return fmt.Sprintf("milestone does not exist [id: %d, repo_id: %d]", err.ID, err.RepoID)
 }
 
 //  ____ ___        .__                    .___

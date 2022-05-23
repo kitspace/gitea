@@ -113,7 +113,6 @@ func apiErrorDefined(ctx *context.Context, err *namedError) {
 func ReqContainerAccess(ctx *context.Context) {
 	if ctx.Doer == nil {
 		ctx.Resp.Header().Add("WWW-Authenticate", `Bearer realm="`+setting.AppURL+`v2/token"`)
-		ctx.Resp.Header().Add("WWW-Authenticate", `Basic`)
 		apiErrorDefined(ctx, errUnauthorized)
 	}
 }
@@ -367,7 +366,7 @@ func GetBlob(ctx *context.Context) {
 		return
 	}
 
-	s, err := packages_module.NewContentStore().Get(packages_module.BlobHash256Key(blob.Blob.HashSHA256))
+	s, _, err := packages_service.GetPackageFileStream(ctx, blob.File)
 	if err != nil {
 		apiError(ctx, http.StatusInternalServerError, err)
 		return
@@ -506,7 +505,7 @@ func GetManifest(ctx *context.Context) {
 		return
 	}
 
-	s, err := packages_module.NewContentStore().Get(packages_module.BlobHash256Key(manifest.Blob.HashSHA256))
+	s, _, err := packages_service.GetPackageFileStream(ctx, manifest.File)
 	if err != nil {
 		apiError(ctx, http.StatusInternalServerError, err)
 		return

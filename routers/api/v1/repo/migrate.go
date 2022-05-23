@@ -48,6 +48,8 @@ func Migrate(ctx *context.APIContext) {
 	//     "$ref": "#/responses/Repository"
 	//   "403":
 	//     "$ref": "#/responses/forbidden"
+	//   "409":
+	//     description: The repository with the same name already exists.
 	//   "422":
 	//     "$ref": "#/responses/validationError"
 
@@ -59,7 +61,7 @@ func Migrate(ctx *context.APIContext) {
 		err       error
 	)
 	if len(form.RepoOwner) != 0 {
-		repoOwner, err = user_model.GetUserByName(form.RepoOwner)
+		repoOwner, err = user_model.GetUserByName(ctx, form.RepoOwner)
 	} else if form.RepoOwnerID != 0 {
 		repoOwner, err = user_model.GetUserByID(form.RepoOwnerID)
 	} else {

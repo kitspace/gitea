@@ -13,6 +13,7 @@ import (
 	"strings"
 
 	"code.gitea.io/gitea/models"
+	"code.gitea.io/gitea/models/db"
 	"code.gitea.io/gitea/models/organization"
 	"code.gitea.io/gitea/models/perm"
 	repo_model "code.gitea.io/gitea/models/repo"
@@ -20,6 +21,7 @@ import (
 	user_model "code.gitea.io/gitea/models/user"
 	"code.gitea.io/gitea/modules/base"
 	"code.gitea.io/gitea/modules/context"
+	"code.gitea.io/gitea/modules/convert"
 	"code.gitea.io/gitea/modules/log"
 	"code.gitea.io/gitea/modules/web"
 	"code.gitea.io/gitea/routers/utils"
@@ -120,7 +122,7 @@ func TeamsAction(ctx *context.Context) {
 		}
 		uname := utils.RemoveUsernameParameterSuffix(strings.ToLower(ctx.FormString("uname")))
 		var u *user_model.User
-		u, err = user_model.GetUserByName(uname)
+		u, err = user_model.GetUserByName(ctx, uname)
 		if err != nil {
 			if user_model.IsErrUserNotExist(err) {
 				ctx.Flash.Error(ctx.Tr("form.user_not_exist"))
@@ -327,6 +329,48 @@ func TeamRepositories(ctx *context.Context) {
 	}
 	ctx.Data["Units"] = unit_model.Units
 	ctx.HTML(http.StatusOK, tplTeamRepositories)
+}
+
+// SearchTeam api for searching teams
+func SearchTeam(ctx *context.Context) {
+	listOptions := db.ListOptions{
+		Page:     ctx.FormInt("page"),
+		PageSize: convert.ToCorrectPageSize(ctx.FormInt("limit")),
+	}
+
+	opts := &organization.SearchTeamOptions{
+		UserID:      ctx.Doer.ID,
+		Keyword:     ctx.FormTrim("q"),
+		OrgID:       ctx.Org.Organization.ID,
+		IncludeDesc: ctx.FormString("include_desc") == "" || ctx.FormBool("include_desc"),
+		ListOptions: listOptions,
+	}
+
+	teams, maxResults, err := organization.SearchTeam(opts)
+	if err != nil {
+		log.Error("SearchTeam failed: %v", err)
+		ctx.JSON(http.StatusInternalServerError, map[string]interface{}{
+			"ok":    false,
+			"error": "SearchTeam internal failure",
+		})
+		return
+	}
+
+	apiTeams, err := convert.ToTeams(teams, false)
+	if err != nil {
+		log.Error("convert ToTeams failed: %v", err)
+		ctx.JSON(http.StatusInternalServerError, map[string]interface{}{
+			"ok":    false,
+			"error": "SearchTeam failed to get units",
+		})
+		return
+	}
+
+	ctx.SetTotalCountHeader(maxResults)
+	ctx.JSON(http.StatusOK, map[string]interface{}{
+		"ok":   true,
+		"data": apiTeams,
+	})
 }
 
 // EditTeam render team edit page

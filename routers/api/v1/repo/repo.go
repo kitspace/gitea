@@ -15,6 +15,7 @@ import (
 	"code.gitea.io/gitea/models/db"
 	"code.gitea.io/gitea/models/organization"
 	"code.gitea.io/gitea/models/perm"
+	access_model "code.gitea.io/gitea/models/perm/access"
 	repo_model "code.gitea.io/gitea/models/repo"
 	unit_model "code.gitea.io/gitea/models/unit"
 	user_model "code.gitea.io/gitea/models/user"
@@ -22,6 +23,7 @@ import (
 	"code.gitea.io/gitea/modules/convert"
 	"code.gitea.io/gitea/modules/git"
 	"code.gitea.io/gitea/modules/log"
+	repo_module "code.gitea.io/gitea/modules/repository"
 	"code.gitea.io/gitea/modules/setting"
 	api "code.gitea.io/gitea/modules/structs"
 	"code.gitea.io/gitea/modules/util"
@@ -30,23 +32,6 @@ import (
 	"code.gitea.io/gitea/routers/api/v1/utils"
 	repo_service "code.gitea.io/gitea/services/repository"
 )
-
-var searchOrderByMap = map[string]map[string]db.SearchOrderBy{
-	"asc": {
-		"alpha":   db.SearchOrderByAlphabetically,
-		"created": db.SearchOrderByOldest,
-		"updated": db.SearchOrderByLeastUpdated,
-		"size":    db.SearchOrderBySize,
-		"id":      db.SearchOrderByID,
-	},
-	"desc": {
-		"alpha":   db.SearchOrderByAlphabeticallyReverse,
-		"created": db.SearchOrderByNewest,
-		"updated": db.SearchOrderByRecentUpdated,
-		"size":    db.SearchOrderBySizeReverse,
-		"id":      db.SearchOrderByIDReverse,
-	},
-}
 
 // Search repositories via options
 func Search(ctx *context.APIContext) {
@@ -193,7 +178,7 @@ func Search(ctx *context.APIContext) {
 		if len(sortOrder) == 0 {
 			sortOrder = "asc"
 		}
-		if searchModeMap, ok := searchOrderByMap[sortOrder]; ok {
+		if searchModeMap, ok := context.SearchOrderByMap[sortOrder]; ok {
 			if orderBy, ok := searchModeMap[sortMode]; ok {
 				opts.OrderBy = orderBy
 			} else {
@@ -225,7 +210,7 @@ func Search(ctx *context.APIContext) {
 			})
 			return
 		}
-		accessMode, err := models.AccessLevel(ctx.Doer, repo)
+		accessMode, err := access_model.AccessLevel(ctx.Doer, repo)
 		if err != nil {
 			ctx.JSON(http.StatusInternalServerError, api.SearchError{
 				OK:    false,
@@ -234,7 +219,6 @@ func Search(ctx *context.APIContext) {
 		}
 		results[i] = convert.ToRepo(repo, accessMode)
 	}
-
 	ctx.SetLinkHeader(int(count), opts.PageSize)
 	ctx.SetTotalCountHeader(count)
 	ctx.JSON(http.StatusOK, api.SearchResults{
@@ -265,7 +249,8 @@ func CreateUserRepo(ctx *context.APIContext, owner *user_model.User, opt api.Cre
 		if repo_model.IsErrRepoAlreadyExist(err) {
 			ctx.Error(http.StatusConflict, "", "The repository with the same name already exists.")
 		} else if db.IsErrNameReserved(err) ||
-			db.IsErrNamePatternNotAllowed(err) {
+			db.IsErrNamePatternNotAllowed(err) ||
+			repo_module.IsErrIssueLabelTemplateLoad(err) {
 			ctx.Error(http.StatusUnprocessableEntity, "", err)
 		} else {
 			ctx.Error(http.StatusInternalServerError, "CreateRepository", err)
@@ -380,7 +365,7 @@ func Generate(ctx *context.APIContext) {
 	ctxUser := ctx.Doer
 	var err error
 	if form.Owner != ctxUser.Name {
-		ctxUser, err = user_model.GetUserByName(form.Owner)
+		ctxUser, err = user_model.GetUserByName(ctx, form.Owner)
 		if err != nil {
 			if user_model.IsErrUserNotExist(err) {
 				ctx.JSON(http.StatusNotFound, map[string]interface{}{
@@ -571,7 +556,7 @@ func GetByID(ctx *context.APIContext) {
 		return
 	}
 
-	perm, err := models.GetUserRepoPermission(repo, ctx.Doer)
+	perm, err := access_model.GetUserRepoPermission(ctx, repo, ctx.Doer)
 	if err != nil {
 		ctx.Error(http.StatusInternalServerError, "AccessLevel", err)
 		return
@@ -631,7 +616,7 @@ func Edit(ctx *context.APIContext) {
 	}
 
 	if opts.MirrorInterval != nil {
-		if err := updateMirrorInterval(ctx, opts); err != nil {
+		if err := updateMirror(ctx, opts); err != nil {
 			return
 		}
 	}
@@ -960,37 +945,67 @@ func updateRepoArchivedState(ctx *context.APIContext, opts api.EditRepoOption) e
 	return nil
 }
 
-// updateMirrorInterval updates the repo's mirror Interval
-func updateMirrorInterval(ctx *context.APIContext, opts api.EditRepoOption) error {
+// updateMirror updates a repo's mirror Interval and EnablePrune
+func updateMirror(ctx *context.APIContext, opts api.EditRepoOption) error {
 	repo := ctx.Repo.Repository
 
+	// only update mirror if interval or enable prune are provided
+	if opts.MirrorInterval == nil && opts.EnablePrune == nil {
+		return nil
+	}
+
+	// these values only make sense if the repo is a mirror
+	if !repo.IsMirror {
+		err := fmt.Errorf("repo is not a mirror, can not change mirror interval")
+		ctx.Error(http.StatusUnprocessableEntity, err.Error(), err)
+		return err
+	}
+
+	// get the mirror from the repo
+	mirror, err := repo_model.GetMirrorByRepoID(ctx, repo.ID)
+	if err != nil {
+		log.Error("Failed to get mirror: %s", err)
+		ctx.Error(http.StatusInternalServerError, "MirrorInterval", err)
+		return err
+	}
+
+	// update MirrorInterval
 	if opts.MirrorInterval != nil {
-		if !repo.IsMirror {
-			err := fmt.Errorf("repo is not a mirror, can not change mirror interval")
-			ctx.Error(http.StatusUnprocessableEntity, err.Error(), err)
-			return err
-		}
-		mirror, err := repo_model.GetMirrorByRepoID(repo.ID)
+
+		// MirrorInterval should be a duration
+		interval, err := time.ParseDuration(*opts.MirrorInterval)
 		if err != nil {
-			log.Error("Failed to get mirror: %s", err)
-			ctx.Error(http.StatusInternalServerError, "MirrorInterval", err)
-			return err
-		}
-		if interval, err := time.ParseDuration(*opts.MirrorInterval); err == nil {
-			mirror.Interval = interval
-			mirror.Repo = repo
-			if err := repo_model.UpdateMirror(mirror); err != nil {
-				log.Error("Failed to Set Mirror Interval: %s", err)
-				ctx.Error(http.StatusUnprocessableEntity, "MirrorInterval", err)
-				return err
-			}
-			log.Trace("Repository %s/%s Mirror Interval was Updated to %s", ctx.Repo.Owner.Name, repo.Name, interval)
-		} else {
 			log.Error("Wrong format for MirrorInternal Sent: %s", err)
 			ctx.Error(http.StatusUnprocessableEntity, "MirrorInterval", err)
 			return err
 		}
+
+		// Ensure the provided duration is not too short
+		if interval != 0 && interval < setting.Mirror.MinInterval {
+			err := fmt.Errorf("invalid mirror interval: %s is below minimum interval: %s", interval, setting.Mirror.MinInterval)
+			ctx.Error(http.StatusUnprocessableEntity, "MirrorInterval", err)
+			return err
+		}
+
+		mirror.Interval = interval
+		mirror.Repo = repo
+		mirror.ScheduleNextUpdate()
+		log.Trace("Repository %s Mirror[%d] Set Interval: %s NextUpdateUnix: %s", repo.FullName(), mirror.ID, interval, mirror.NextUpdateUnix)
 	}
+
+	// update EnablePrune
+	if opts.EnablePrune != nil {
+		mirror.EnablePrune = *opts.EnablePrune
+		log.Trace("Repository %s Mirror[%d] Set EnablePrune: %t", repo.FullName(), mirror.ID, mirror.EnablePrune)
+	}
+
+	// finally update the mirror in the DB
+	if err := repo_model.UpdateMirror(ctx, mirror); err != nil {
+		log.Error("Failed to Set Mirror Interval: %s", err)
+		ctx.Error(http.StatusUnprocessableEntity, "MirrorInterval", err)
+		return err
+	}
+
 	return nil
 }
 
