@@ -1,4 +1,4 @@
-FROM golang:1.17-alpine3.15
+FROM golang:1.19-alpine3.16
 
 ARG GOPROXY
 ENV GOPROXY ${GOPROXY:-direct}
@@ -29,6 +29,9 @@ RUN apk --no-cache add \
 #Setup repo
 COPY . /go/src/code.gitea.io/gitea
 WORKDIR /go/src/code.gitea.io/gitea
+
+#Remove .git because of -buildvcs and submodule issue
+RUN rm -f .git
 
 RUN npm install --no-save
 RUN make build
