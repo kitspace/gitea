@@ -1,11 +1,11 @@
-FROM golang:1.17-alpine3.15
+FROM golang:1.19-alpine3.16
 
 ARG GOPROXY
 ENV GOPROXY ${GOPROXY:-direct}
 
 ARG TAGS="sqlite sqlite_unlock_notify"
 ENV TAGS "bindata timetzdata $TAGS"
-ARG CGO_EXTRA_CFLAGS
+ARG CGO_EXTRA_CFLAGS="-buildvcs=false"
 
 #Build & runtime deps
 RUN apk --no-cache add \

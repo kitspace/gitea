@@ -807,7 +807,7 @@ func UploadFilePostJson(ctx *context.Context) {
 		Message:      message,
 		Files:        form.Files,
 	}); err != nil {
-		if models.IsErrLFSFileLocked(err) {
+		if git_model.IsErrLFSFileLocked(err) {
 			response["message"] = ctx.Tr("repo.editor.upload_file_is_locked")
 			ctx.JSON(http.StatusUnauthorized, response)
 		} else if models.IsErrFilenameInvalid(err) {
