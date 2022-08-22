@@ -16,6 +16,9 @@ RUN apk --no-cache add build-base git nodejs npm
 COPY . ${GOPATH}/src/code.gitea.io/gitea
 WORKDIR ${GOPATH}/src/code.gitea.io/gitea
 
+#Remove .git because of -buildvcs and submodule issue
+RUN rm -f .git
+
 #Checkout version if set
 RUN if [ -n "${GITEA_VERSION}" ]; then git checkout "${GITEA_VERSION}"; fi \
   && make clean-all build
