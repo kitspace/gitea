@@ -30,6 +30,9 @@ RUN apk --no-cache add \
 COPY . /go/src/code.gitea.io/gitea
 WORKDIR /go/src/code.gitea.io/gitea
 
+#Remove .git because of -buildvcs and submodule issue
+RUN rm -f .git
+
 RUN npm install --no-save
 RUN make build
 
