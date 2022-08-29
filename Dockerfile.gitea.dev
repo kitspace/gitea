@@ -5,7 +5,7 @@ ENV GOPROXY ${GOPROXY:-direct}
 
 ARG TAGS="sqlite sqlite_unlock_notify"
 ENV TAGS "bindata timetzdata $TAGS"
-ARG CGO_EXTRA_CFLAGS
+ARG CGO_EXTRA_CFLAGS="-buildvcs=false"
 
 #Build & runtime deps
 RUN apk --no-cache add \
