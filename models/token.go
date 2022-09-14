@@ -180,6 +180,18 @@ func UpdateAccessToken(t *AccessToken) error {
 	return err
 }
 
+func RenewAccessToken(t *AccessToken) (*AccessToken, error) {
+	_, err := db.GetEngine(db.DefaultContext).Table("access_token").Where("name = ?", t.Name).And("uid = ?", t.UID).Delete()
+	if err != nil {
+		return nil, err
+	}
+	err = NewAccessToken(t)
+	if err != nil {
+		return nil, err
+	}
+	return t, nil
+}
+
 // CountAccessTokens count access tokens belongs to given user by options
 func CountAccessTokens(opts ListAccessTokensOptions) (int64, error) {
 	sess := db.GetEngine(db.DefaultContext).Where("uid=?", opts.UserID)

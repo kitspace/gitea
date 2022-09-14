@@ -3,6 +3,7 @@ package auth
 import (
 	"net/http"
 
+	"code.gitea.io/gitea/models"
 	"code.gitea.io/gitea/models/db"
 	user_model "code.gitea.io/gitea/models/user"
 	"code.gitea.io/gitea/modules/context"
@@ -110,7 +111,6 @@ func KitspaceSignUp(ctx *context.Context) {
 
 	// Return the success response with user details
 	response["user"] = convert.ToUser(u, u)
-
 	ctx.JSON(http.StatusCreated, response)
 }
 
@@ -189,6 +189,41 @@ func KitspaceSignIn(ctx *context.Context) {
 	ctx.JSON(http.StatusOK, response)
 }
 
+const KitspaceTokenName = "__kitspace"
+
+func getKitspaceAccessToken(userID int64) (*models.AccessToken, error) {
+	token := &models.AccessToken{
+		UID:  userID,
+		Name: KitspaceTokenName,
+	}
+
+	exists, err := models.AccessTokenByNameExists(token)
+
+	if err != nil {
+		return nil, err
+	}
+
+	if !exists {
+		return createKitspaceAccessToken(userID)
+	}
+
+	return models.RenewAccessToken(token)
+}
+
+func createKitspaceAccessToken(userID int64) (*models.AccessToken, error) {
+	token := &models.AccessToken{
+		UID:  userID,
+		Name: KitspaceTokenName,
+	}
+
+	err := models.NewAccessToken(token)
+
+	if err != nil {
+		return nil, err
+	}
+	return token, nil
+}
+
 func GetKitspaceSession(ctx *context.Context) {
 	// swagger:operation GET /user/kitspace/session
 	// ---
@@ -206,9 +241,24 @@ func GetKitspaceSession(ctx *context.Context) {
 		user = convert.ToUser(ctx.Doer, ctx.Doer)
 	}
 
+	if user != nil && ctx.Session.Get("ApiToken") == nil {
+		token, err := getKitspaceAccessToken(user.ID)
+		if err != nil {
+			ctx.ServerError("Kitspace session error", err)
+			return
+		}
+
+		err = ctx.Session.Set("ApiToken", token.Token)
+		if err != nil {
+			ctx.ServerError("Kitspace session error", err)
+			return
+		}
+	}
+
 	response := make(map[string]interface{})
 	response["user"] = user
 	response["csrf"] = ctx.Data["CsrfToken"]
+	response["ApiToken"] = ctx.Session.Get(("ApiToken"))
 
 	ctx.JSON(http.StatusOK, response)
 }
