@@ -382,6 +382,7 @@ func getUserName(gothUser *goth.User) string {
 
 // HandleSignOut resets the session and sets the cookies
 func HandleSignOut(ctx *context.Context) {
+	auth.DeleteKitspaceAccessToken(ctx.Doer.ID)
 	_ = ctx.Session.Flush()
 	_ = ctx.Session.Destroy(ctx.Resp, ctx.Req)
 	ctx.DeleteCookie(setting.CookieUserName)
