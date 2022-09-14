@@ -207,6 +207,63 @@ func UpdateAccessToken(t *AccessToken) error {
 	return err
 }
 
+const KitspaceTokenName = "__kitspace"
+const KitspaceApiToken = "ApiToken"
+
+func RenewKitspaceAccessToken(t *AccessToken) (*AccessToken, error) {
+	err := DeleteKitspaceAccessToken(t.UID)
+	if err != nil {
+		return nil, err
+	}
+	err = NewAccessToken(t)
+	if err != nil {
+		return nil, err
+	}
+	return t, nil
+}
+
+func GetKitspaceAccessToken(userID int64) (*AccessToken, error) {
+	token := &AccessToken{
+		UID:  userID,
+		Name: KitspaceTokenName,
+	}
+
+	exists, err := AccessTokenByNameExists(token)
+
+	if err != nil {
+		return nil, err
+	}
+
+	if !exists {
+		return CreateKitspaceAccessToken(userID)
+	}
+
+	return RenewKitspaceAccessToken(token)
+}
+
+func CreateKitspaceAccessToken(userID int64) (*AccessToken, error) {
+	token := &AccessToken{
+		UID:  userID,
+		Name: KitspaceTokenName,
+	}
+
+	err := NewAccessToken(token)
+
+	if err != nil {
+		return nil, err
+	}
+	return token, nil
+}
+
+func DeleteKitspaceAccessToken(userID int64) error {
+	_, err := db.GetEngine(db.DefaultContext).
+		Table("access_token").
+		Where("name = ?", KitspaceTokenName).
+		And("uid = ?", userID).
+		Delete()
+	return err
+}
+
 // CountAccessTokens count access tokens belongs to given user by options
 func CountAccessTokens(opts ListAccessTokensOptions) (int64, error) {
 	sess := db.GetEngine(db.DefaultContext).Where("uid=?", opts.UserID)

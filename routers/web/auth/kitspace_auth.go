@@ -3,6 +3,7 @@ package auth
 import (
 	"net/http"
 
+	auth_model "code.gitea.io/gitea/models/auth"
 	"code.gitea.io/gitea/models/db"
 	user_model "code.gitea.io/gitea/models/user"
 	"code.gitea.io/gitea/modules/context"
@@ -110,7 +111,6 @@ func KitspaceSignUp(ctx *context.Context) {
 
 	// Return the success response with user details
 	response["user"] = convert.ToUser(u, u)
-
 	ctx.JSON(http.StatusCreated, response)
 }
 
@@ -206,9 +206,24 @@ func GetKitspaceSession(ctx *context.Context) {
 		user = convert.ToUser(ctx.Doer, ctx.Doer)
 	}
 
+	if user != nil && ctx.Session.Get(auth_model.KitspaceApiToken) == nil {
+		token, err := auth_model.GetKitspaceAccessToken(user.ID)
+		if err != nil {
+			ctx.ServerError("Kitspace session error", err)
+			return
+		}
+
+		err = ctx.Session.Set(auth_model.KitspaceApiToken, token.Token)
+		if err != nil {
+			ctx.ServerError("Kitspace session error", err)
+			return
+		}
+	}
+
 	response := make(map[string]interface{})
 	response["user"] = user
 	response["csrf"] = ctx.Data["CsrfToken"]
+	response["ApiToken"] = ctx.Session.Get(auth_model.KitspaceApiToken)
 
 	ctx.JSON(http.StatusOK, response)
 }
