@@ -1,0 +1,24 @@
+#!/bin/sh
+# This is a workaround to fix the vcs error caused by mounting the gitea source directory
+# into the container, in development, so we remove the `.git` dir but this will remove it
+# from the host manchine too. To work around this, we move `.git` dir, then build gitea, then
+# reset `.git` again. 
+
+cleanup() {
+    # If the container gets killed before reseting the .git folder
+    # reset it in the clean up command.
+    [ ! -e ".git" ] && mv /tmp/git .git 
+}
+
+# Traps
+trap 'cleanup' SIGTERM
+trap 'cleanup' SIGINT
+trap 'cleanup' SIGQUIT
+
+# Move the git folder before building and add it again.
+( mv .git /tmp/git && make build && mv /tmp/git .git && cp gitea /app/gitea/ && /usr/bin/entrypoint ) &
+
+wait $!
+
+# run the clean up procedure if the one of the commands above fails.
+cleanup
