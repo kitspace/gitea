@@ -121,6 +121,12 @@ func CountSessions() (int64, error) {
 
 // CleanupSessions cleans up expired sessions
 func CleanupSessions(maxLifetime int64) error {
-	_, err := db.GetEngine(db.DefaultContext).Where("expiry <= ?", timeutil.TimeStampNow().Add(-maxLifetime)).Delete(&Session{})
+	engine := db.GetEngine(db.DefaultContext).Where("expiry <= ?", timeutil.TimeStampNow().Add(-maxLifetime))
+	err := CleanKitspaceAccessToken(engine)
+	if err != nil {
+		return err
+	}
+
+	_, err = engine.Delete(&Session{})
 	return err
 }

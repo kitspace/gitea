@@ -15,6 +15,8 @@ import (
 	"code.gitea.io/gitea/modules/setting"
 	"code.gitea.io/gitea/modules/timeutil"
 	"code.gitea.io/gitea/modules/util"
+	chi_session "gitea.com/go-chi/session"
+	"xorm.io/xorm"
 
 	gouuid "github.com/google/uuid"
 	lru "github.com/hashicorp/golang-lru"
@@ -262,6 +264,29 @@ func DeleteKitspaceAccessToken(userID int64) error {
 		And("uid = ?", userID).
 		Delete()
 	return err
+}
+
+// CleanKitspaceAccessToken clean the tokens for expired sessions
+func CleanKitspaceAccessToken(engine *xorm.Session) error {
+	var expiredSessions []Session
+	engine.Find(&expiredSessions)
+
+	for _, expiredSession := range expiredSessions {
+		kv, err := chi_session.DecodeGob(expiredSession.Data)
+		if err != nil {
+			return err
+		}
+		uid := kv["uid"]
+		if uid == nil {
+			return fmt.Errorf("could find user id while deleting an expired session")
+		}
+
+		err = DeleteKitspaceAccessToken(uid.(int64))
+		if err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 // CountAccessTokens count access tokens belongs to given user by options
