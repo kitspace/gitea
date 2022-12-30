@@ -7,13 +7,13 @@ import (
 	"code.gitea.io/gitea/models/db"
 	user_model "code.gitea.io/gitea/models/user"
 	"code.gitea.io/gitea/modules/context"
-	"code.gitea.io/gitea/modules/convert"
 	"code.gitea.io/gitea/modules/log"
 	"code.gitea.io/gitea/modules/password"
 	"code.gitea.io/gitea/modules/setting"
 	"code.gitea.io/gitea/modules/structs"
 	"code.gitea.io/gitea/modules/web"
-	"code.gitea.io/gitea/services/auth"
+	auth_service "code.gitea.io/gitea/services/auth"
+	"code.gitea.io/gitea/services/convert"
 	"code.gitea.io/gitea/services/forms"
 	"code.gitea.io/gitea/services/mailer"
 )
@@ -141,7 +141,7 @@ func KitspaceSignIn(ctx *context.Context) {
 	//     "$ref": "#/responses/validationError"
 
 	form := web.GetForm(ctx).(*forms.SignInForm)
-	u, _, err := auth.UserSignIn(form.UserName, form.Password)
+	u, _, err := auth_service.UserSignIn(form.UserName, form.Password)
 
 	response := make(map[string]interface{})
 	if err != nil {
